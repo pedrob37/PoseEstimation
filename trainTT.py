@@ -118,10 +118,10 @@ class trainTT:
                             val_paf_out = val_paf_outputs[ii]
                             val_paf_out = torch.reshape(val_paf_out, [val_paf_out.shape[0],
                                                                       int(val_paf_out.shape[1] / 3),
-                                                                      3,
                                                                       val_paf_out.shape[2],
                                                                       val_paf_out.shape[3],
-                                                                      val_paf_out.shape[4]])
+                                                                      val_paf_out.shape[4],
+                                                                      3])
 
                             val_loss_HM += self.HM_torch_loss(val_batch_heatmap, val_heatmap_out)
                             val_loss_PAF += self.PAF_torch_loss(val_batch_paf, val_paf_out)

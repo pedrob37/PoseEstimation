@@ -20,6 +20,15 @@ if __name__ == '__main__':
     # -----  Loading the init options -----
     opt = BaseOptions().parse()
 
+    # Patch size handling
+    if len(opt.patch_size) == 1:
+        opt.patch_size = opt.patch_size * 3
+    elif len(opt.patch_size) == 3:
+        # 3D, so this is fine
+        pass
+    else:
+        raise OSError("Patch size should either be one, or three integers")
+
     ## Relevant job directories
     base_dir = opt.base_dir
     CACHE_DIR = f"{base_dir}/Outputs-Pose-Estimation/Cache/{opt.job_name}"
@@ -186,7 +195,7 @@ if __name__ == '__main__':
             #                 source_key='image'),
             RandCropByPosNegLabeld(keys=relevant_keys,
                                    label_key='label', image_key='image',
-                                   spatial_size=[opt.patch_size, opt.patch_size, opt.patch_size], pos=100, neg=0,
+                                   spatial_size=opt.patch_size, pos=100, neg=0,
                                    num_samples=opt.num_samples),
             Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
             ToTensord(keys=relevant_keys)

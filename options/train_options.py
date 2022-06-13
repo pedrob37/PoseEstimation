@@ -15,7 +15,7 @@ class BaseOptions:
         parser.add_argument('--base_dir', type=str, default='/nfs/home/pedro', help='Base directory path')
         parser.add_argument('--gpu_number', type=str, default='0', help='GPU number')
         parser.add_argument('--batch_size', type=int, default=1, help='input batch size')
-        parser.add_argument('--patch_size', default=40, type=int, help='Size of the patches extracted from the image')
+        parser.add_argument('--patch_size', nargs='+', default=40, type=int, help='Size of the patches extracted from the image')
         parser.add_argument('--input_nc', type=int, default=1, help='# of input image channels')
         parser.add_argument('--output_nc', type=int, default=1, help='# of output image channels')
         parser.add_argument('--resample', default=False, help='Decide or not to rescale the images to a new resolution')

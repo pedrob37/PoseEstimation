@@ -1,20 +1,23 @@
 import torch
 import numpy as np
 import os
+from utils.utils import val_saver
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class trainTT:
-    def __init__(self, models_dir, writer, train_loader, val_loader, opt, model, optimizer, criterion_hm,
-                 criterion_paf, selected_heatmaps, selected_pafs):
+    def __init__(self, models_dir, figures_dir, writer, train_loader, val_loader, opt, model, optimizer, scheduler,
+                 criterion_hm, criterion_paf, selected_heatmaps, selected_pafs):
         self.models_dir = models_dir
+        self.figures_dir = figures_dir
         self.writer = writer
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.opt = opt
         self.model = model
         self.optimizer = optimizer
+        self.scheduler = scheduler
 
         self.HM_torch_loss = criterion_hm
         self.PAF_torch_loss = criterion_paf
@@ -36,21 +39,11 @@ class trainTT:
             for iteration, patch_s in enumerate(self.train_loader):
                 print(f"Fractional memory usage: {torch.cuda.memory_allocated() / torch.cuda.max_memory_allocated():.3f}")
                 batch_image = patch_s['image'].to(device)
-                # batch_label = patch_s['label']
 
                 # Concatenate all heatmaps and all PAFs into one structure
                 batch_heatmap = torch.concat(tuple(patch_s[f"heatmap_{x}"] for x in self.selected_heatmaps), dim=1).to(
                     device)
                 batch_paf = torch.concat(tuple(patch_s[f"PAF_{x}"] for x in self.selected_PAFs), dim=1).to(device)
-
-                # Check
-                # xx = batch_heatmap
-                # for i in range(batch_heatmap.shape[0]):
-                #     for j in range(batch_heatmap.shape[1]):
-                #         tmp11 = np.squeeze(xx[i, j, ...].data.cpu().numpy())
-                #         print('i,j, sum', str(i), str(j), tmp11.sum())
-                #         del tmp11
-                # del xx
 
                 # Outputs
                 heatmap_outputs, paf_outputs = self.model(batch_image)
@@ -59,7 +52,7 @@ class trainTT:
                 loss_HM = 0
                 loss_PAF = 0
 
-                # Looping through batches? Seems odd
+                # Looping through stage samples: Loss is aggregation of these
                 for ii in range(len(heatmap_outputs)):
                     heatmap_out = heatmap_outputs[ii]
                     paf_out = paf_outputs[ii]
@@ -71,11 +64,9 @@ class trainTT:
                                                       3
                                                       ])
 
-                    # Isn't first variable size BS x ..., and second is 1 x ...?
-                    # print(batch_heatmap.shape, heatmap_out.shape)
-                    # print(batch_paf.shape, paf_out.shape)
                     loss_HM += self.HM_torch_loss(batch_heatmap, heatmap_out)
                     loss_PAF += self.PAF_torch_loss(batch_paf, paf_out)
+
                     del heatmap_out, paf_out
 
                 loss = loss_HM + loss_PAF
@@ -92,9 +83,9 @@ class trainTT:
                 self.optimizer.step()
 
                 # Variable deletion for next loop
-                del loss_HM, loss_PAF
+                del loss_HM, loss_PAF, loss
                 del heatmap_outputs, paf_outputs
-                del batch_image, batch_heatmap, batch_paf
+                del batch_image, batch_heatmap, batch_paf, patch_s
 
             ## Validation
             if (epoch + 1) % self.opt.validation_interval == 0:
@@ -104,7 +95,6 @@ class trainTT:
                     agg_loss = []
                     for val_sample in self.val_loader:
                         val_batch_image = val_sample['image'].to(device)
-                        # batch_label = patch_s['label']
 
                         # Concatenate all heatmaps and all PAFs into one structure
                         val_batch_heatmap = torch.concat(
@@ -112,14 +102,8 @@ class trainTT:
                         val_batch_paf = torch.concat(
                             tuple(val_sample[f"PAF_{x}"] for x in self.selected_PAFs), dim=1).to(device)
 
-                        # Check
-                        # xx = batch_heatmap
-                        # for i in range(batch_heatmap.shape[0]):
-                        #     for j in range(batch_heatmap.shape[1]):
-                        #         tmp11 = np.squeeze(xx[i, j, ...].data.cpu().numpy())
-                        #         print('i,j, sum', str(i), str(j), tmp11.sum())
-                        #         del tmp11
-                        # del xx
+                        # Affine: For output-saving purposes
+                        val_affine = val_sample['image_meta_dict']['affine'][0, ...]
 
                         # Outputs
                         val_heatmap_outputs, val_paf_outputs = self.model(val_batch_image)
@@ -128,7 +112,7 @@ class trainTT:
                         val_loss_HM = 0
                         val_loss_PAF = 0
 
-                        # Looping through batches? Seems odd
+                        # Looping through stage samples: Loss is aggregation of these
                         for ii in range(len(val_heatmap_outputs)):
                             val_heatmap_out = val_heatmap_outputs[ii]
                             val_paf_out = val_paf_outputs[ii]
@@ -139,11 +123,25 @@ class trainTT:
                                                                       val_paf_out.shape[3],
                                                                       val_paf_out.shape[4]])
 
-                            # Isn't first variable size BS x ..., and second is 1 x ...?
                             val_loss_HM += self.HM_torch_loss(val_batch_heatmap, val_heatmap_out)
                             val_loss_PAF += self.PAF_torch_loss(val_batch_paf, val_paf_out)
+
+                            # Save outputs once every epoch
+                            if not agg_loss:  # i.e.: Empty list, so must be first validation step
+                                # Save output heatmap and paf
+                                val_saver(val_heatmap_out.max(axis=1)[0].squeeze().cpu().detach().numpy(),
+                                          val_affine, self.figures_dir, "Val_heatmap", epoch, ii)
+                                val_saver(val_paf_out.sum(axis=1).squeeze().cpu().detach().numpy(),
+                                          val_affine, self.figures_dir, "Val_paf", epoch, ii)
+                                if ii == 0:
+                                    # Save OGs
+                                    val_saver(val_heatmap_out.max(axis=1)[0].squeeze().cpu().detach().numpy(),
+                                              val_affine, self.figures_dir, "GT_heatmap", epoch, None)
+                                    val_saver(val_paf_out.sum(axis=1).squeeze().cpu().detach().numpy(),
+                                              val_affine, self.figures_dir, "GT_paf", epoch, None)
                             del val_heatmap_out, val_paf_out
 
+                        # Calculate validation loss
                         val_loss = val_loss_HM + val_loss_PAF
 
                         # Aggregate
@@ -152,7 +150,7 @@ class trainTT:
                         agg_paf_loss.append(val_loss_PAF.item())
 
                         # Variable deletion for next loop
-                        del val_loss_HM, val_loss_PAF
+                        del val_loss_HM, val_loss_PAF, val_loss
                         del val_heatmap_outputs, val_paf_outputs
                         del val_batch_image, val_batch_heatmap, val_batch_paf
 
@@ -161,3 +159,5 @@ class trainTT:
                     writerBB.add_scalar("Loss/Val_Backbone_Overall", np.mean(agg_loss), epoch)
                     writerBB.add_scalar("Loss/Val_Backbone_HeatMap", np.mean(agg_heatmap_loss), epoch)
                     writerBB.add_scalar("Loss/Val_Backbone_PAF", np.mean(agg_paf_loss), epoch)
+                    del agg_loss, agg_heatmap_loss, agg_paf_loss
+            self.scheduler.step()

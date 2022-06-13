@@ -169,8 +169,8 @@ if __name__ == '__main__':
         print(f'The length of the validation is {len(val_images)}')
         print(f'The length of the inference is {len(inf_images)}')
 
-        # No need to shuffle!
-        do_shuffling = False
+        # Shuffle!
+        do_shuffling = True
 
         # MONAI transforms
         relevant_keys = ['image', 'label'] + [f"heatmap_{hm}" for hm in selected_heatmaps] + [f"PAF_{paf}" for paf in
@@ -255,11 +255,12 @@ if __name__ == '__main__':
 
     # Create optimizer
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, opt.scheduler_gamma)
 
     # Create logger
     writer = SummaryWriter(os.path.join(LOG_DIR, 'runBackBone'))
 
-    TT = trainTT(MODELS_DIR, writer, train_loader, val_loader, opt, model, optimizer, criterion_heatmap, criterion_paf,
+    TT = trainTT(MODELS_DIR, FIG_DIR, writer, train_loader, val_loader, opt, model, optimizer, scheduler, criterion_heatmap, criterion_paf,
                  selected_heatmaps, selected_PAFs)
     TT.train()
     print("BB-training completed")

@@ -312,7 +312,7 @@ class ResNet(nn.Module):
         # print("Layer2", x.shape)
         if len(self.layers) >= 3:
             x = self.layer3(x)
-            print("Layer3", x.shape)
+            # print("Layer3", x.shape)
         if len(self.layers) == 4:
             x = self.layer4(x)
             # print("Layer4", x.shape)

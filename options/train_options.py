@@ -35,7 +35,7 @@ class BaseOptions:
         parser.add_argument('--name', type=str, default='experiment_name', help='name of the experiment. It decides where to store samples and models')
         parser.add_argument('--models', type=str, default='cycle_gan', help='chooses which models to use. cycle_gan')
 
-        parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints', help='models are saved here')
+        # parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints', help='models are saved here')
         parser.add_argument('--workers', default=10, type=int, help='number of data loading workers')
         parser.add_argument('--norm', type=str, default='instance', help='instance normalization or batch normalization')
 
@@ -63,6 +63,7 @@ class BaseOptions:
                             help='Path to pretrained models')
         parser.add_argument('--model_version', type=str, default='old', help='What version of the model to use')
         parser.add_argument('--phase', type=str, default='train', help='Train or inference')
+        parser.add_argument('--augmentation_level', type=str, default='none', help='none, light')
         parser.add_argument('--resnet_size', default=18, type=int, help='ResNet size (18, 34, or 50)')
         parser.add_argument('--pretrained_backbone', type=self.str2bool, nargs='?', const=True, default=True,
                             help='Using coordconv or not')
@@ -103,12 +104,12 @@ class BaseOptions:
         print(message)
 
         # save to the disk
-        expr_dir = os.path.join(opt.checkpoints_dir, opt.name)
-        mkdirs(expr_dir)
-        file_name = os.path.join(expr_dir, 'opt.txt')
-        with open(file_name, 'wt') as opt_file:
-            opt_file.write(message)
-            opt_file.write('\n')
+        # expr_dir = os.path.join(opt.checkpoints_dir, opt.name)
+        # mkdirs(expr_dir)
+        # file_name = os.path.join(expr_dir, 'opt.txt')
+        # with open(file_name, 'wt') as opt_file:
+        #     opt_file.write(message)
+        #     opt_file.write('\n')
 
     def parse(self):
 

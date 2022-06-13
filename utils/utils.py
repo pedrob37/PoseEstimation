@@ -66,12 +66,24 @@ def create_path(some_dir):
         pass
 
 
-def save_img(image, affine, filename):
+def save_img(image, affine, filename, raise_error=True):
     nifti_img = nib.Nifti1Image(image, affine)
     if os.path.exists(filename):
-        raise OSError("File already exists! Killing job")
+        if raise_error:
+            raise OSError("File already exists! Killing job")
+        else:
+            pass
     else:
         nib.save(nifti_img, filename)
+
+
+def val_saver(array, affine_array, fig_path, basename, epoch, step=None):
+    extension = f"_step_{step}.nii.gz" if step else ".nii.gz"
+    save_img(array,
+             affine=affine_array,
+             filename=os.path.join(fig_path,
+                                   f"{basename}_epoch_{epoch}{extension}"),
+             raise_error=False)
 
 
 def create_folds(some_list, train_split=0.8, val_split=0.1):

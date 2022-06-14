@@ -30,12 +30,8 @@ class trainTT:
         for epoch in range(self.opt.num_epochs_backbone):
             print(f'Epoch: {epoch}')
 
+            # Set model to train mode
             self.model.train()
-            if epoch % self.opt.validation_interval == 1:
-                name = os.path.join(self.models_dir, f'PoseEst_model_{epoch}.pt')
-                torch.save(self.model.state_dict(), name)
-                print(f'Saving Model, epoch {epoch}...')
-
             for iteration, patch_s in enumerate(self.train_loader):
                 print(f"Fractional memory usage: {torch.cuda.memory_allocated() / torch.cuda.max_memory_allocated():.3f}")
                 batch_image = patch_s['image'].to(device)
@@ -89,6 +85,12 @@ class trainTT:
 
             ## Validation
             if (epoch + 1) % self.opt.validation_interval == 0:
+                # Set model to eval mode
+                self.model.eval()
+                # Save Model
+                name = os.path.join(self.models_dir, f'PoseEst_model_{epoch}.pt')
+                torch.save(self.model.state_dict(), name)
+                print(f'Saving Model, epoch {epoch}...')
                 with torch.no_grad():
                     agg_heatmap_loss = []
                     agg_paf_loss = []
@@ -135,9 +137,9 @@ class trainTT:
                                           val_affine, self.figures_dir, "Val_paf", epoch, ii)
                                 if ii == 0:
                                     # Save OGs
-                                    val_saver(val_heatmap_out.max(axis=1)[0].squeeze().cpu().detach().numpy(),
+                                    val_saver(val_batch_heatmap.max(axis=1)[0].squeeze().cpu().detach().numpy(),
                                               val_affine, self.figures_dir, "GT_heatmap", epoch, None)
-                                    val_saver(val_paf_out.sum(axis=1).squeeze().cpu().detach().numpy(),
+                                    val_saver(val_batch_paf.sum(axis=1).squeeze().cpu().detach().numpy(),
                                               val_affine, self.figures_dir, "GT_paf", epoch, None)
                             del val_heatmap_out, val_paf_out
 
@@ -155,7 +157,7 @@ class trainTT:
                         del val_batch_image, val_batch_heatmap, val_batch_paf
 
                     # Write
-                    print(f'Val BackBone: {np.mean(agg_loss)}')
+                    print(f'Val BackBone: {np.mean(agg_loss):.3f}')
                     writerBB.add_scalar("Loss/Val_Backbone_Overall", np.mean(agg_loss), epoch)
                     writerBB.add_scalar("Loss/Val_Backbone_HeatMap", np.mean(agg_heatmap_loss), epoch)
                     writerBB.add_scalar("Loss/Val_Backbone_PAF", np.mean(agg_paf_loss), epoch)

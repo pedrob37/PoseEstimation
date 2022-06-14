@@ -4,7 +4,7 @@ import glob
 from torch.utils.data import DataLoader
 import monai
 from monai.transforms import Compose, LoadImaged, AddChanneld, CropForegroundd, RandCropByPosNegLabeld, Orientationd, \
-    ToTensord, NormalizeIntensityd, Spacingd
+    ToTensord, NormalizeIntensityd, Spacingd, RandAffined, RandGaussianNoised
 from monai.data import list_data_collate
 from utils.utils import *
 import random
@@ -90,6 +90,7 @@ if __name__ == '__main__':
 
         # For heatmaps and PAFs loop through only relevant IDs
         from collections import OrderedDict
+
         train_heatmaps, val_heatmaps, inf_heatmaps = OrderedDict(), OrderedDict(), OrderedDict()  # {}, {}, {}
         train_PAFs, val_PAFs, inf_PAFs = OrderedDict(), OrderedDict(), OrderedDict()  # {}, {}, {}
 
@@ -126,7 +127,7 @@ if __name__ == '__main__':
             # Assign to relevant keys
             val_heatmaps[f"SABRE_{base_sub}"] = sub_relevant_heatmaps
             val_PAFs[f"SABRE_{base_sub}"] = sub_relevant_PAFs
-            
+
         # Inference
         for subject in inf_images:
             # Isolate subject ID
@@ -182,24 +183,38 @@ if __name__ == '__main__':
         do_shuffling = True
 
         # MONAI transforms
+        num_heatmaps = len([f"heatmap_{hm}" for hm in selected_heatmaps])
+        num_PAFs = len([f"PAF_{paf}" for paf in selected_PAFs])
         relevant_keys = ['image', 'label'] + [f"heatmap_{hm}" for hm in selected_heatmaps] + [f"PAF_{paf}" for paf in
                                                                                               selected_PAFs]
-        train_transforms = Compose([
-            LoadImaged(keys=relevant_keys),
-            AddChanneld(keys=relevant_keys),
-            # Orientationd(keys=relevant_keys, axcodes='RAS'),
-            NormalizeIntensityd(keys=['image'], channel_wise=True),
-            # RandGaussianNoised(keys=['image'], prob=0.75, mean=0.0, std=1.75),
-            # RandRotate90d(keys=['image', 'heatmap', 'paf'], prob=0.5, spatial_axes=[0, 2]),
-            # CropForegroundd(keys=relevant_keys,
-            #                 source_key='image'),
-            RandCropByPosNegLabeld(keys=relevant_keys,
-                                   label_key='label', image_key='image',
-                                   spatial_size=opt.patch_size, pos=100, neg=0,
-                                   num_samples=opt.num_samples),
-            Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
-            ToTensord(keys=relevant_keys)
-        ])
+        nearest_list = ["nearest"] * (num_heatmaps + num_PAFs)
+        zeros_list = ["zeros"] * (num_heatmaps + num_PAFs)
+        # Transform lists
+        train_transform_list = [LoadImaged(keys=relevant_keys),
+                                AddChanneld(keys=relevant_keys),
+                                NormalizeIntensityd(keys=['image'], channel_wise=True),
+                                ]
+        if opt.augmentation_level == "none":
+            # Don't add any augmentations
+            pass
+        elif opt.augmentation_level == 'light':
+            train_transform_list.extend([RandGaussianNoised(keys=['image'], prob=0.5, mean=0.0, std=0.4),
+                                         RandAffined(keys=relevant_keys,
+                                                     scale_range=(0.1, 0.1, 0.1),
+                                                     rotate_range=(0.25, 0.25, 0.25),
+                                                     translate_range=(20, 20, 20),
+                                                     mode=["bilinear", "nearest"] + nearest_list,
+                                                     as_tensor_output=False, prob=1.0,
+                                                     padding_mode=['zeros', 'zeros'] + zeros_list)])
+        # Extend with missing transforms
+        train_transform_list.extend([RandCropByPosNegLabeld(keys=relevant_keys,
+                                                            label_key='label', image_key='image',
+                                                            spatial_size=opt.patch_size, pos=100, neg=0,
+                                                            num_samples=opt.num_samples),
+                                     Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
+                                     ToTensord(keys=relevant_keys)])
+        # Compose
+        train_transforms = Compose(train_transform_list)
 
         val_transforms = Compose([
             LoadImaged(keys=relevant_keys),
@@ -269,7 +284,8 @@ if __name__ == '__main__':
     # Create logger
     writer = SummaryWriter(os.path.join(LOG_DIR, 'runBackBone'))
 
-    TT = trainTT(MODELS_DIR, FIG_DIR, writer, train_loader, val_loader, opt, model, optimizer, scheduler, criterion_heatmap, criterion_paf,
+    TT = trainTT(MODELS_DIR, FIG_DIR, writer, train_loader, val_loader, opt, model, optimizer, scheduler,
+                 criterion_heatmap, criterion_paf,
                  selected_heatmaps, selected_PAFs)
     TT.train()
     print("BB-training completed")

@@ -4,7 +4,7 @@ import glob
 from torch.utils.data import DataLoader
 import monai
 from monai.transforms import Compose, LoadImaged, AddChanneld, CropForegroundd, RandCropByPosNegLabeld, Orientationd, \
-    ToTensord, NormalizeIntensityd, Spacingd, RandAffined, RandGaussianNoised
+    ToTensord, NormalizeIntensityd, Spacingd, RandAffined, RandGaussianNoised, AsChannelFirstd
 from monai.data import list_data_collate
 from utils.utils import *
 import random
@@ -183,16 +183,19 @@ if __name__ == '__main__':
         do_shuffling = True
 
         # MONAI transforms
-        num_heatmaps = len([f"heatmap_{hm}" for hm in selected_heatmaps])
-        num_PAFs = len([f"PAF_{paf}" for paf in selected_PAFs])
         relevant_keys = ['image', 'label'] + [f"heatmap_{hm}" for hm in selected_heatmaps] + [f"PAF_{paf}" for paf in
                                                                                               selected_PAFs]
+        PAF_less_keys = ['image', 'label'] + [f"heatmap_{hm}" for hm in selected_heatmaps]
+        PAF_keys = [f"PAF_{paf}" for paf in selected_PAFs]
+        num_heatmaps = len([f"heatmap_{hm}" for hm in selected_heatmaps])
+        num_PAFs = len([f"PAF_{paf}" for paf in selected_PAFs])
         nearest_list = ["nearest"] * (num_heatmaps + num_PAFs)
         zeros_list = ["zeros"] * (num_heatmaps + num_PAFs)
         # Transform lists
         train_transform_list = [LoadImaged(keys=relevant_keys),
-                                AddChanneld(keys=relevant_keys),
-                                NormalizeIntensityd(keys=['image'], channel_wise=True),
+                                AddChanneld(keys=PAF_less_keys),
+                                AsChannelFirstd(keys=PAF_keys),
+                                NormalizeIntensityd(keys=['image', 'label'], channel_wise=True),
                                 ]
         if opt.augmentation_level == "none":
             # Don't add any augmentations
@@ -200,6 +203,7 @@ if __name__ == '__main__':
         elif opt.augmentation_level == 'light':
             train_transform_list.extend([RandGaussianNoised(keys=['image'], prob=0.5, mean=0.0, std=0.4),
                                          RandAffined(keys=relevant_keys,
+                                                     spatial_size=(201, 201, 71),
                                                      scale_range=(0.1, 0.1, 0.1),
                                                      rotate_range=(0.25, 0.25, 0.25),
                                                      translate_range=(20, 20, 20),
@@ -218,7 +222,8 @@ if __name__ == '__main__':
 
         val_transforms = Compose([
             LoadImaged(keys=relevant_keys),
-            AddChanneld(keys=relevant_keys),
+            AddChanneld(keys=PAF_less_keys),
+            AsChannelFirstd(keys=PAF_keys),
             # Orientationd(keys=relevant_keys, axcodes='RAS'),
             NormalizeIntensityd(keys=['image'], channel_wise=True),
             # RandGaussianNoised(keys=['image'], prob=0.75, mean=0.0, std=1.75),
@@ -252,9 +257,10 @@ if __name__ == '__main__':
             ])
 
         ## Define CacheDataset and DataLoader for training and validation
-        train_ds = monai.data.PersistentDataset(data=train_data_dict,
-                                                transform=train_transforms,
-                                                cache_dir=CACHE_DIR)
+        train_ds = monai.data.Dataset(data=train_data_dict,
+                                      transform=train_transforms,
+                                      # cache_dir=CACHE_DIR
+                                      )
 
         train_loader = DataLoader(train_ds,
                                   batch_size=opt.batch_size,
@@ -263,9 +269,10 @@ if __name__ == '__main__':
                                   collate_fn=list_data_collate)
 
         # Validation
-        val_ds = monai.data.PersistentDataset(data=val_data_dict,
-                                              transform=val_transforms,
-                                              cache_dir=CACHE_DIR)
+        val_ds = monai.data.Dataset(data=val_data_dict,
+                                    transform=val_transforms,
+                                    # cache_dir=CACHE_DIR
+                                    )
 
         val_loader = DataLoader(val_ds,
                                 batch_size=opt.batch_size,

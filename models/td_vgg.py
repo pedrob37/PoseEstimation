@@ -50,7 +50,7 @@ class VGG(nn.Module):
 
     def forward(self, x):
         x = self.vgg(x)
-        print(x.shape)
+        # print(x.shape)
         x = self.feature_extractor(x)
-        print(x.shape)
+        # print(x.shape)
         return x

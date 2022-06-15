@@ -4,13 +4,13 @@ import torch
 
 
 class PAFModel(nn.Module):
-    def __init__(self, backend, backend_outp_feats, n_joints, n_paf, n_stages=7, n_vector_field=3):
+    def __init__(self, backend, backend_outp_feats, n_joints, n_paf, n_stages=7):
         super(PAFModel, self).__init__()
         assert (n_stages > 0)
         self.backend = backend
-        stages = [Stage(backend_outp_feats, n_joints, n_paf, True, n_vector_field)]
+        stages = [Stage(backend_outp_feats, n_joints, n_paf, True)]
         for _ in range(n_stages - 1):
-            stages.append(Stage(backend_outp_feats, n_joints, n_paf, False, n_vector_field))
+            stages.append(Stage(backend_outp_feats, n_joints, n_paf, False))
         self.stages = nn.ModuleList(stages)
 
     def forward(self, x):
@@ -29,8 +29,8 @@ class PAFModel(nn.Module):
 
 
 class PAFModel2019(nn.Module):
-    def __init__(self, backend, backend_outp_feats, n_joints, n_paf, n_stages_total, n_stages_paf, n_vector_field=3,
-                 num_conv_blocks=5):
+    def __init__(self, backend, backend_outp_feats, n_joints, n_paf, n_stages_total, n_stages_paf,
+                 num_conv_blocks=5, densenet_approach=True):
         super(PAFModel2019, self).__init__()
         assert (n_stages_total > 0)
         assert (n_stages_paf > 0)
@@ -39,11 +39,15 @@ class PAFModel2019(nn.Module):
         self.n_stages_heatmap = n_stages_total - n_stages_paf
         self.n_stages_total = n_stages_total
         self.backend = backend
-        stages = [Stage2019(backend_outp_feats, n_joints, n_paf, "first", n_vector_field, num_conv_blocks)]
-        for _ in range(n_stages_paf):
-            stages.append(Stage2019(backend_outp_feats, n_joints, n_paf, "paf", n_vector_field, num_conv_blocks))
-        for _ in range(self.n_stages_heatmap):
-            stages.append(Stage2019(backend_outp_feats, n_joints, n_paf, "heatmap", n_vector_field, num_conv_blocks))
+        # First PAF stage
+        stages = [Stage2019(backend_outp_feats, n_joints, n_paf, "first_paf", num_conv_blocks, densenet_approach)]
+        # Loop through remaining PAF stages
+        for _ in range(n_stages_paf-1):
+            stages.append(Stage2019(backend_outp_feats, n_joints, n_paf, "paf", num_conv_blocks, densenet_approach))
+        # First Heatmap stage
+        stages.append(Stage2019(backend_outp_feats, n_joints, n_paf, "first_heatmap", num_conv_blocks, densenet_approach))
+        for _ in range(self.n_stages_heatmap-1):
+            stages.append(Stage2019(backend_outp_feats, n_joints, n_paf, "heatmap", num_conv_blocks, densenet_approach))
         self.stages = nn.ModuleList(stages)
 
     def forward(self, x):
@@ -70,7 +74,7 @@ class PAFModel2019(nn.Module):
 
 
 class Stage(nn.Module):
-    def __init__(self, backend_outp_feats, n_joints, n_paf, stage1, n_vector_field):
+    def __init__(self, backend_outp_feats, n_joints, n_paf, stage1):
         super(Stage, self).__init__()
         inp_feats = backend_outp_feats
         if stage1:
@@ -105,18 +109,21 @@ class Stage(nn.Module):
 
 
 class Stage2019(nn.Module):
-    def __init__(self, backend_outp_feats, n_joints, n_paf, current_stage, n_vector_field, num_conv_blocks):
+    def __init__(self, backend_outp_feats, n_joints, n_paf, current_stage, num_conv_blocks, densenet_approach):
         super(Stage2019, self).__init__()
         inp_feats = backend_outp_feats
         self.num_conv_blocks = num_conv_blocks
-        if current_stage == "first":
-            self.conv_list = make_paf_block_2019(inp_feats, n_paf, num_conv_blocks)
+        if current_stage == "first_paf":
+            self.conv_list = make_paf_block_2019(inp_feats, n_paf, num_conv_blocks, densenet_approach)
+        elif current_stage == "first_heatmap":
+            inp_feats = backend_outp_feats + n_paf
+            self.conv_list = make_paf_block_2019(inp_feats, n_joints, num_conv_blocks, densenet_approach)
         elif current_stage == "paf":
             inp_feats = backend_outp_feats + n_paf
-            self.conv_list = make_paf_block_2019(inp_feats, n_paf, num_conv_blocks)
+            self.conv_list = make_paf_block_2019(inp_feats, n_paf, num_conv_blocks, densenet_approach)
         elif current_stage == "heatmap":
-            inp_feats = backend_outp_feats + n_paf
-            self.conv_list = make_paf_block_2019(inp_feats, n_joints, num_conv_blocks)
+            inp_feats = backend_outp_feats + n_joints
+            self.conv_list = make_paf_block_2019(inp_feats, n_joints, num_conv_blocks, densenet_approach)
         else:
             raise NotImplementedError
         init(self.conv_list)
@@ -153,13 +160,38 @@ def make_paf_block_stage2(inp_feats, output_feats):
     return nn.Sequential(*layers)
 
 
-def make_paf_block_2019(inp_feats, output_feats, num_conv_blocks):
-    # ModuleList usage and loop creation: https://pytorch.org/docs/stable/generated/torch.nn.ModuleList.html
-    convs = nn.ModuleList([make_standard_block(inp_feats, 128, 3)])
-    convs += nn.ModuleList([make_standard_block(128, 128, 3) for _ in range(3*num_conv_blocks)])
-    # Define final layers
-    final_layers = [make_standard_block(128, 128, 1, 1, 0)]
-    final_layers += [nn.Conv3d(512, output_feats, 1, 1, 0)]
-    convs += final_layers
+def make_paf_block_2019(inp_feats, output_feats, num_conv_blocks, densenet_approach):
+    if not densenet_approach:
+        # ModuleList usage and loop creation: https://pytorch.org/docs/stable/generated/torch.nn.ModuleList.html
+        # convs = nn.ModuleList([make_standard_block(inp_feats, 128, 3, 1, 1)])
+        # First set of convs take in 128 channels
+        convs = nn.ModuleList([make_standard_block(inp_feats, 128, 3, 1, 1),
+                               make_standard_block(128, 128, 3, 1, 1),
+                               make_standard_block(128, 128, 3, 1, 1)])
+        # Subsequent trios take in 128 x 3 = 384 channels
+        trio_blocks = [make_standard_block(128 * 3, 128, 3, 1, 1),
+                       make_standard_block(128, 128, 3, 1, 1),
+                       make_standard_block(128, 128, 3, 1, 1)] * (num_conv_blocks-1)
+        convs += nn.ModuleList(trio_blocks)
+        # Define final layers
+        final_layers = [make_standard_block(128 * 3, 128, 1, 1, 0)]  # 3 == Num consecutive convs in block
+        # Why 512 here originally?
+        final_layers += [nn.Conv3d(128, output_feats, 1, 1, 0)]
+        convs += final_layers
+    else:
+        # ModuleList usage and loop creation: https://pytorch.org/docs/stable/generated/torch.nn.ModuleList.html
+        # First set of convs take in 128 channels
+        convs = nn.ModuleList([make_standard_block(inp_feats, 64, 3, 1, 1),
+                               make_standard_block(64, 32, 3, 1, 1),
+                               make_standard_block(32, 32, 3, 1, 1)])
+        # Subsequent trios take in 128 channels, outputs from each conv are concatenated: 64 + 32 + 32 = 128 channels
+        trio_blocks = [make_standard_block(128, 64, 3, 1, 1),
+                       make_standard_block(64, 32, 3, 1, 1),
+                       make_standard_block(32, 32, 3, 1, 1)] * (num_conv_blocks-1)
+        convs += nn.ModuleList(trio_blocks)
+        # Define final layers
+        final_layers = [make_standard_block(128, 128, 1, 1, 0)]
+        # Why 512 here originally?
+        final_layers += [nn.Conv3d(128, output_feats, 1, 1, 0)]
+        convs += final_layers
     return convs
-

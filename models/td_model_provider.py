@@ -126,18 +126,18 @@ def create_model(opt):
         model = PAFModel(backend=backend,
                          backend_outp_feats=backend_feats,
                          n_joints=opt.num_joints,
-                         n_paf=opt.num_pafs*3,
-                         n_stages=opt.num_stages,
-                         n_vector_field=opt.num_vector_fields)
+                         n_paf=opt.num_pafs*opt.num_vector_fields,
+                         n_stages=opt.num_stages
+                         )
     elif opt.model_version == "new":
         model = PAFModel2019(backend=backend,
                              backend_outp_feats=backend_feats,
                              n_joints=opt.num_joints,
-                             n_paf=opt.num_pafs*3,
-                             n_stages_total=opt.num_stages*2,
+                             n_paf=opt.num_pafs*opt.num_vector_fields,  # Times ND for N spatial dimensions
+                             n_stages_total=opt.num_stages*2,  # Multiply by two because PAF and HM stages are separate
                              n_stages_paf=opt.num_stages_paf,
-                             n_vector_field=opt.num_vector_fields,
                              num_conv_blocks=5,
+                             densenet_approach=opt.densenet_approach
                              )
     if not opt.load_model == 'none':
         model.load_state_dict(torch.load(opt.loadModel))

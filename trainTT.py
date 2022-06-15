@@ -39,7 +39,7 @@ class trainTT:
                 # Concatenate all heatmaps and all PAFs into one structure
                 batch_heatmap = torch.concat(tuple(patch_s[f"heatmap_{x}"] for x in self.selected_heatmaps), dim=1).to(
                     device)
-                batch_paf = torch.concat(tuple(patch_s[f"PAF_{x}"] for x in self.selected_PAFs), dim=1).to(device)
+                batch_paf = torch.stack(tuple(patch_s[f"PAF_{x}"] for x in self.selected_PAFs), dim=5).to(device)
 
                 # Outputs
                 heatmap_outputs, paf_outputs = self.model(batch_image)
@@ -53,11 +53,11 @@ class trainTT:
                     heatmap_out = heatmap_outputs[ii]
                     paf_out = paf_outputs[ii]
                     paf_out = torch.reshape(paf_out, [paf_out.shape[0],
-                                                      int(paf_out.shape[1] / 3),
+                                                      3,
                                                       paf_out.shape[2],
                                                       paf_out.shape[3],
                                                       paf_out.shape[4],
-                                                      3
+                                                      int(paf_out.shape[1] / 3)
                                                       ])
 
                     loss_HM += self.HM_torch_loss(batch_heatmap, heatmap_out)
@@ -119,11 +119,12 @@ class trainTT:
                             val_heatmap_out = val_heatmap_outputs[ii]
                             val_paf_out = val_paf_outputs[ii]
                             val_paf_out = torch.reshape(val_paf_out, [val_paf_out.shape[0],
-                                                                      int(val_paf_out.shape[1] / 3),
+                                                                      3,
                                                                       val_paf_out.shape[2],
                                                                       val_paf_out.shape[3],
                                                                       val_paf_out.shape[4],
-                                                                      3])
+                                                                      int(val_paf_out.shape[1] / 3)
+                                                                      ])
 
                             val_loss_HM += self.HM_torch_loss(val_batch_heatmap, val_heatmap_out)
                             val_loss_PAF += self.PAF_torch_loss(val_batch_paf, val_paf_out)
@@ -133,13 +134,13 @@ class trainTT:
                                 # Save output heatmap and paf
                                 val_saver(val_heatmap_out.max(axis=1)[0].squeeze().cpu().detach().numpy(),
                                           val_affine, self.figures_dir, "Val_heatmap", epoch, ii)
-                                val_saver(val_paf_out.sum(axis=1).squeeze().cpu().detach().numpy(),
+                                val_saver(val_paf_out.sum(axis=-1).squeeze().permute(3, 1, 2, 0).cpu().detach().numpy(),
                                           val_affine, self.figures_dir, "Val_paf", epoch, ii)
                                 if ii == 0:
                                     # Save OGs
                                     val_saver(val_batch_heatmap.max(axis=1)[0].squeeze().cpu().detach().numpy(),
                                               val_affine, self.figures_dir, "GT_heatmap", epoch, None)
-                                    val_saver(val_batch_paf.sum(axis=1).squeeze().cpu().detach().numpy(),
+                                    val_saver(val_batch_paf.sum(axis=-1).squeeze().cpu().permute(3, 1, 2, 0).detach().numpy(),
                                               val_affine, self.figures_dir, "GT_paf", epoch, None)
                             del val_heatmap_out, val_paf_out
 

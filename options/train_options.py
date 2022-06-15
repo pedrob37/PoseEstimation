@@ -51,7 +51,7 @@ class BaseOptions:
         parser.add_argument('--num_joints', default=13, type=int, help='Number of joints to regress')
         parser.add_argument('--num_pafs', default=11, type=int, help='Number of PAFs to regress')
         parser.add_argument('--num_stages', default=7, type=int, help='Number of iterative stage steps')
-        parser.add_argument('--num_stages_paf', default=6, type=int, help='Number of PAF stages')
+        parser.add_argument('--num_stages_paf', default=7, type=int, help='Number of PAF stages')
         parser.add_argument('--num_vector_fields', default=3, type=int, help='Number of vector fields')
         parser.add_argument('--num_samples', default=1, type=int, help='Number of samples')
         parser.add_argument('--model', type=str, default='vgg', help='Base model to select')
@@ -67,6 +67,8 @@ class BaseOptions:
         parser.add_argument('--resnet_size', default=18, type=int, help='ResNet size (18, 34, or 50)')
         parser.add_argument('--pretrained_backbone', type=self.str2bool, nargs='?', const=True, default=True,
                             help='Using coordconv or not')
+        parser.add_argument('--densenet_approach', type=self.str2bool, nargs='?', const=True, default=True,
+                            help='Using densenet approach to 3x3 conv blocks or not')
 
         self.initialized = True
 

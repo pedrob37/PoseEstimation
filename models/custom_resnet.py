@@ -208,7 +208,7 @@ class ResNet(nn.Module):
 
         block_avgpool = get_avgpool()
         conv1_kernel, conv1_stride, conv1_padding = get_conv1(conv1_t_size, conv1_t_stride)
-        print("kernel, stride, pad", conv1_kernel, conv1_stride, conv1_padding)
+        # print("kernel, stride, pad", conv1_kernel, conv1_stride, conv1_padding)
         block_inplanes = [int(x * widen_factor) for x in block_inplanes]
 
         self.in_planes = block_inplanes[0]

@@ -42,6 +42,9 @@ class trainTT:
                 # Dimension five because channels are reserved for x, y, z
                 batch_paf = torch.stack(tuple(patch_s[f"PAF_{x}"] for x in self.selected_PAFs), dim=5).to(device)
 
+                # Affine: For output-saving purposes
+                affine = patch_s['image_meta_dict']['affine'][0, ...]
+
                 # Outputs
                 heatmap_outputs, paf_outputs = self.model(batch_image)
 
@@ -63,6 +66,20 @@ class trainTT:
 
                     loss_HM += self.HM_torch_loss(batch_heatmap, heatmap_out)
                     loss_PAF += self.PAF_torch_loss(batch_paf, paf_out)
+
+                    # Save outputs once every epoch
+                    if (iteration == 0) and (ii == len(heatmap_outputs)-1):
+                        # Save output heatmap and paf
+                        val_saver(heatmap_out.max(axis=1)[0].squeeze().cpu().detach().numpy(),
+                                  affine, self.figures_dir, "Train_heatmap", epoch, ii)
+                        val_saver(paf_out.sum(axis=-1).squeeze().permute(3, 1, 2, 0).cpu().detach().numpy(),
+                                  affine, self.figures_dir, "Train_paf", epoch, ii)
+                        if ii == 0:
+                            # Save OGs
+                            val_saver(batch_heatmap.max(axis=1)[0].squeeze().cpu().detach().numpy(),
+                                      affine, self.figures_dir, "Train_GT_heatmap", epoch, None)
+                            val_saver(batch_paf.sum(axis=-1).squeeze().cpu().permute(3, 1, 2, 0).detach().numpy(),
+                                      affine, self.figures_dir, "Train_GT_paf", epoch, None)
 
                     del heatmap_out, paf_out
 
@@ -141,9 +158,9 @@ class trainTT:
                                 if ii == 0:
                                     # Save OGs
                                     val_saver(val_batch_heatmap.max(axis=1)[0].squeeze().cpu().detach().numpy(),
-                                              val_affine, self.figures_dir, "GT_heatmap", epoch, None)
+                                              val_affine, self.figures_dir, "Val_GT_heatmap", epoch, None)
                                     val_saver(val_batch_paf.sum(axis=-1).squeeze().cpu().permute(3, 1, 2, 0).detach().numpy(),
-                                              val_affine, self.figures_dir, "GT_paf", epoch, None)
+                                              val_affine, self.figures_dir, "Val_GT_paf", epoch, None)
                             del val_heatmap_out, val_paf_out
 
                         # Calculate validation loss

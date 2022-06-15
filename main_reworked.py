@@ -266,7 +266,8 @@ if __name__ == '__main__':
                                   batch_size=opt.batch_size,
                                   shuffle=do_shuffling,
                                   num_workers=opt.workers,
-                                  collate_fn=list_data_collate)
+                                  collate_fn=list_data_collate
+                                  )
 
         # Validation
         val_ds = monai.data.PersistentDataset(data=val_data_dict,
@@ -278,7 +279,8 @@ if __name__ == '__main__':
                                 batch_size=opt.batch_size,
                                 shuffle=do_shuffling,
                                 num_workers=opt.workers,
-                                collate_fn=list_data_collate)
+                                collate_fn=list_data_collate
+                                )
 
     # Model loading: If parameter is not None, then it has to, currently, be a full path to a model!
     model, criterion_heatmap, criterion_paf = create_model(opt)

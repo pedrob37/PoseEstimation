@@ -39,6 +39,7 @@ class trainTT:
                 # Concatenate all heatmaps and all PAFs into one structure
                 batch_heatmap = torch.concat(tuple(patch_s[f"heatmap_{x}"] for x in self.selected_heatmaps), dim=1).to(
                     device)
+                # Dimension five because channels are reserved for x, y, z
                 batch_paf = torch.stack(tuple(patch_s[f"PAF_{x}"] for x in self.selected_PAFs), dim=5).to(device)
 
                 # Outputs
@@ -101,8 +102,9 @@ class trainTT:
                         # Concatenate all heatmaps and all PAFs into one structure
                         val_batch_heatmap = torch.concat(
                             tuple(val_sample[f"heatmap_{x}"] for x in self.selected_heatmaps), dim=1).to(device)
-                        val_batch_paf = torch.concat(
-                            tuple(val_sample[f"PAF_{x}"] for x in self.selected_PAFs), dim=1).to(device)
+                        # Dimension five because channels are reserved for x, y, z
+                        val_batch_paf = torch.stack(tuple(val_sample[f"PAF_{x}"] for x in self.selected_PAFs),
+                                                    dim=5).to(device)
 
                         # Affine: For output-saving purposes
                         val_affine = val_sample['image_meta_dict']['affine'][0, ...]

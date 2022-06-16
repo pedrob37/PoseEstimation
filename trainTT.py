@@ -80,6 +80,8 @@ class trainTT:
                                       affine, self.figures_dir, "Train_GT_heatmap", epoch, None)
                             val_saver(batch_paf.sum(axis=-1).squeeze().cpu().permute(3, 1, 2, 0).detach().numpy(),
                                       affine, self.figures_dir, "Train_GT_paf", epoch, None)
+                            val_saver(batch_image.sum(axis=-1).squeeze().cpu().permute(3, 1, 2, 0).detach().numpy(),
+                                      affine, self.figures_dir, "Train_Image", epoch, None)
 
                     del heatmap_out, paf_out
 
@@ -164,6 +166,8 @@ class trainTT:
                                               val_affine, self.figures_dir, "Val_GT_heatmap", epoch, None)
                                     val_saver(val_batch_paf.sum(axis=-1).squeeze().cpu().permute(3, 1, 2, 0).detach().numpy(),
                                               val_affine, self.figures_dir, "Val_GT_paf", epoch, None)
+                                    val_saver(val_batch_image.sum(axis=-1).squeeze().cpu().permute(3, 1, 2, 0).detach().numpy(),
+                                              val_affine, self.figures_dir, "Val_Image", epoch, None)
                             del val_heatmap_out, val_paf_out
 
                         # Calculate validation loss

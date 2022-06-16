@@ -33,7 +33,7 @@ class trainTT:
             # Set model to train mode
             self.model.train()
             for iteration, patch_s in enumerate(self.train_loader):
-                print(f"Fractional memory usage: {torch.cuda.memory_allocated() / torch.cuda.max_memory_allocated():.3f}")
+                # print(f"Fractional memory usage: {torch.cuda.memory_allocated() / torch.cuda.max_memory_allocated():.3f}")
                 batch_image = patch_s['image'].to(device)
 
                 # Concatenate all heatmaps and all PAFs into one structure
@@ -84,7 +84,10 @@ class trainTT:
                     del heatmap_out, paf_out
 
                 loss = loss_HM + loss_PAF
-                print(f'BackBone: {loss.item():.3f}')
+                print(f"Epoch {epoch}:\n")
+                print(f'BackBone: {loss.item():.3f},'
+                      f'Heatmap: {loss_HM:.3f},'
+                      f'PAF: {loss_PAF:.3f}\n')
 
                 # Epoch is very small, so just log once per epoch
                 if iteration == np.random.randint(0, len(self.train_loader)):
@@ -177,7 +180,11 @@ class trainTT:
                         del val_batch_image, val_batch_heatmap, val_batch_paf
 
                     # Write
-                    print(f'Val BackBone: {np.mean(agg_loss):.3f}')
+                    print(f"Val Epoch {epoch}:\n")
+                    print(f'Val BackBone: {np.mean(agg_loss):.3f},'
+                          f'Val Heatmap: {np.mean(agg_heatmap_loss):.3f},'
+                          f'Val PAF: {np.mean(agg_paf_loss):.3f}\n')
+
                     writerBB.add_scalar("Loss/Val_Backbone_Overall", np.mean(agg_loss), epoch)
                     writerBB.add_scalar("Loss/Val_Backbone_HeatMap", np.mean(agg_heatmap_loss), epoch)
                     writerBB.add_scalar("Loss/Val_Backbone_PAF", np.mean(agg_paf_loss), epoch)

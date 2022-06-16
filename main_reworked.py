@@ -201,14 +201,14 @@ if __name__ == '__main__':
             # Don't add any augmentations
             pass
         elif opt.augmentation_level == 'light':
-            train_transform_list.extend([RandGaussianNoised(keys=['image'], prob=0.5, mean=0.0, std=0.4),
+            train_transform_list.extend([RandGaussianNoised(keys=['image'], prob=0.5, mean=0.0, std=0.25),
                                          RandAffined(keys=relevant_keys,
                                                      spatial_size=(201, 201, 71),
                                                      scale_range=(0.1, 0.1, 0.1),
                                                      rotate_range=(0.25, 0.25, 0.25),
                                                      translate_range=(20, 20, 20),
                                                      mode=["bilinear", "nearest"] + nearest_list,
-                                                     as_tensor_output=False, prob=1.0,
+                                                     as_tensor_output=False, prob=0.5,
                                                      padding_mode=['zeros', 'zeros'] + zeros_list)])
         # Extend with missing transforms
         train_transform_list.extend([RandCropByPosNegLabeld(keys=relevant_keys,

@@ -139,10 +139,11 @@ def create_model(opt, models_dir=None, model_device=None):
                              num_conv_blocks=5,
                              densenet_approach=opt.densenet_approach
                              )
-    if opt.phase == "inference":
-        # Find relevant model
-        import glob
-        model_files = glob.glob(os.path.join(models_dir, '*.pth'))
+
+    # Find relevant model
+    import glob
+    model_files = glob.glob(os.path.join(models_dir, '*.pth'))
+    if len(model_files) > 0:
         for some_model_file in model_files:
             print(some_model_file)
         sorted_model_files = sorted(model_files, key=os.path.getmtime)
@@ -152,6 +153,7 @@ def create_model(opt, models_dir=None, model_device=None):
 
         model.load_state_dict(checkpoint)
         print('Loaded models from ' + models_dir)
+
     criterion_hm = parse_criterion(opt.criterion_heatmap)
     criterion_paf = parse_criterion(opt.criterion_paf)
     return model, criterion_hm, criterion_paf

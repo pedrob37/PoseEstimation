@@ -47,7 +47,7 @@ class BaseOptions:
 
         # Additional variables
         parser.add_argument('--num_epochs_backbone', default=50, type=int, help='Number of backbone epochs')
-        parser.add_argument('--validation_interval', default=10, type=int, help='Validation interval')
+        parser.add_argument('--validation_interval', default=1, type=int, help='Validation interval')
         parser.add_argument('--num_joints', default=13, type=int, help='Number of joints to regress')
         parser.add_argument('--num_pafs', default=11, type=int, help='Number of PAFs to regress')
         parser.add_argument('--num_stages', default=7, type=int, help='Number of iterative stage steps')

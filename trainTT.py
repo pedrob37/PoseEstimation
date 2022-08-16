@@ -231,8 +231,11 @@ class testTT:
         self.debug = debug
 
     def test(self):
-        from monai.inferers import SimpleInferer
-        simple_inferer = SimpleInferer()
+        if self.opt.weighted_sampling:
+            from monai.inferers import SimpleInferer
+            simple_inferer = SimpleInferer()
+        else:
+            from utils.utils import sliding_window_inference
         self.model.eval()
         for iteration, patch_s in enumerate(self.inf_loader):
             batch_image = patch_s['image'].to(device)
@@ -248,14 +251,16 @@ class testTT:
             #                                                         self.model,
             #                                                         mode="gaussian",
             #                                                         overlap=0.0)
-            heatmap_outputs, paf_outputs = simple_inferer(batch_image,
-                                                          self.model)
-            # heatmap_outputs, paf_outputs = sliding_window_inference(batch_image,
-            #                                                         self.opt.patch_size,
-            #                                                         1,
-            #                                                         self.model,
-            #                                                         mode="gaussian",
-            #                                                         overlap=0.0)
+            if self.opt.weighted_sampling:
+                heatmap_outputs, paf_outputs = simple_inferer(batch_image,
+                                                              self.model)
+            else:
+                heatmap_outputs, paf_outputs = sliding_window_inference(batch_image,
+                                                                        self.opt.patch_size,
+                                                                        1,
+                                                                        self.model,
+                                                                        mode="gaussian",
+                                                                        overlap=0.0)
 
             val_saver(heatmap_outputs.squueze().cpu().detach().numpy(), affine, self.figures_dir,
                       f"HM_{sub_name}", 999, iteration)

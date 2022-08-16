@@ -66,13 +66,13 @@ def create_path(some_dir):
         pass
 
 
-def save_img(image, affine, filename, raise_error=True):
+def save_img(image, affine, filename, overwrite=False):
     nifti_img = nib.Nifti1Image(image, affine)
     if os.path.exists(filename):
-        if raise_error:
-            raise OSError("File already exists! Killing job")
-        else:
-            pass
+        if overwrite:
+            nib.save(nifti_img, filename)
+        # else:
+        #     print("Not overwriting!")
     else:
         nib.save(nifti_img, filename)
 
@@ -83,7 +83,7 @@ def val_saver(array, affine_array, fig_path, basename, epoch, step=None):
              affine=affine_array,
              filename=os.path.join(fig_path,
                                    f"{basename}_epoch_{epoch}{extension}"),
-             raise_error=False)
+             overwrite=True)
 
 
 def create_folds(some_list, train_split=0.8, val_split=0.1):

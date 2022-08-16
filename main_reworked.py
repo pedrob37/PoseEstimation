@@ -4,16 +4,17 @@ import glob
 from torch.utils.data import DataLoader
 import monai
 from monai.transforms import Compose, LoadImaged, AddChanneld, CropForegroundd, RandCropByPosNegLabeld, Orientationd, \
-    ToTensord, NormalizeIntensityd, Spacingd, RandAffined, RandGaussianNoised, AsChannelFirstd
+    ToTensord, NormalizeIntensityd, Spacingd, RandAffined, RandGaussianNoised, AsChannelFirstd, SpatialCropd
 from monai.data import list_data_collate
 from utils.utils import *
 import random
 from torch.utils.tensorboard import SummaryWriter
 
-from trainTT import trainTT
+from trainTT import trainTT, testTT
 from models.td_model_provider import create_model
 
 if __name__ == '__main__':
+    print(monai.__version__)
     monai.config.print_config()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -100,6 +101,7 @@ if __name__ == '__main__':
             base_sub = regex.findall(os.path.basename(subject))[0]
             sub_relevant_heatmaps = []
             sub_relevant_PAFs = []
+
             # Include only relevant heatmaps/ PAFs
             for relevant_heatmap_ID in selected_heatmaps:
                 sub_relevant_heatmaps.extend(glob.glob(os.path.join(heatmaps_dir,
@@ -117,6 +119,7 @@ if __name__ == '__main__':
             base_sub = regex.findall(os.path.basename(subject))[0]
             sub_relevant_heatmaps = []
             sub_relevant_PAFs = []
+
             # Include only relevant heatmaps/ PAFs
             for relevant_heatmap_ID in selected_heatmaps:
                 sub_relevant_heatmaps.extend(glob.glob(os.path.join(heatmaps_dir,
@@ -195,28 +198,58 @@ if __name__ == '__main__':
         train_transform_list = [LoadImaged(keys=relevant_keys),
                                 AddChanneld(keys=PAF_less_keys),
                                 AsChannelFirstd(keys=PAF_keys),
-                                NormalizeIntensityd(keys=['image', 'label'], channel_wise=True),
+                                # Temp
+                                # CoordConvd(keys=['image'], spatial_channels=(1, 2, 3)),
+                                # Don't normalise? Dealing with binaries
+                                # NormalizeIntensityd(keys=['image', 'label'], channel_wise=True),
                                 ]
-        if opt.augmentation_level == "none":
-            # Don't add any augmentations
-            pass
-        elif opt.augmentation_level == 'light':
-            train_transform_list.extend([RandGaussianNoised(keys=['image'], prob=0.5, mean=0.0, std=0.25),
-                                         RandAffined(keys=relevant_keys,
-                                                     spatial_size=(201, 201, 71),
-                                                     scale_range=(0.1, 0.1, 0.1),
-                                                     rotate_range=(0.25, 0.25, 0.25),
-                                                     translate_range=(20, 20, 20),
-                                                     mode=["bilinear", "nearest"] + nearest_list,
-                                                     as_tensor_output=False, prob=0.5,
-                                                     padding_mode=['zeros', 'zeros'] + zeros_list)])
+
+        # Cropped size
+        if opt.weighted_sampling:
+            cropped_roi_size = opt.patch_size
+            train_transform_list.append(SpatialCropd(keys=['image', 'label'],  # , 'coords'],
+                                                     roi_size=cropped_roi_size,
+                                                     roi_center=(96, 114, 0)))  # Leaning right 56, 74, 0
+            # CoordConvd(keys=['image'], spatial_channels=(1, 2, 3))]
+            if opt.augmentation_level == "none":
+                # Don't add any augmentations
+                pass
+            elif opt.augmentation_level == 'light':
+                train_transform_list.extend([RandGaussianNoised(keys=['image'], prob=0.5, mean=0.0, std=0.25),
+                                             RandAffined(keys=relevant_keys,
+                                                         # spatial_size=(201, 201, 71),
+                                                         scale_range=(0.1, 0.1, 0.1),
+                                                         rotate_range=(0.25, 0.25, 0.25),
+                                                         translate_range=(20, 20, 20),
+                                                         mode=["nearest", "nearest"] + nearest_list,
+                                                         as_tensor_output=False, prob=0.5,
+                                                         padding_mode=['zeros', 'zeros'] + zeros_list)])
+        else:
+            if opt.augmentation_level == "none":
+                # Don't add any augmentations
+                pass
+            elif opt.augmentation_level == 'light':
+                train_transform_list.extend([RandGaussianNoised(keys=['image'], prob=0.5, mean=0.0, std=0.25),
+                                             RandAffined(keys=relevant_keys,
+                                                         spatial_size=(201, 201, 71),
+                                                         scale_range=(0.1, 0.1, 0.1),
+                                                         rotate_range=(0.25, 0.25, 0.25),
+                                                         translate_range=(20, 20, 20),
+                                                         mode=["bilinear", "nearest"] + nearest_list,
+                                                         as_tensor_output=False, prob=0.5,
+                                                         padding_mode=['zeros', 'zeros'] + zeros_list)])
         # Extend with missing transforms
-        train_transform_list.extend([RandCropByPosNegLabeld(keys=relevant_keys,
-                                                            label_key='label', image_key='image',
-                                                            spatial_size=opt.patch_size, pos=100, neg=0,
-                                                            num_samples=opt.num_samples),
-                                     Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
-                                     ToTensord(keys=relevant_keys)])
+        if not opt.weighted_sampling:
+            train_transform_list.extend([RandCropByPosNegLabeld(keys=relevant_keys,
+                                                                label_key='label', image_key='image',
+                                                                spatial_size=opt.patch_size, pos=100, neg=0,
+                                                                num_samples=opt.num_samples),
+                                         Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
+                                         ToTensord(keys=relevant_keys)])
+        elif opt.weighted_sampling:
+            train_transform_list.extend([Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
+                                         ToTensord(keys=relevant_keys)])
+
         # Compose
         train_transforms = Compose(train_transform_list)
 
@@ -256,11 +289,36 @@ if __name__ == '__main__':
                 ToTensord(keys=relevant_keys)
             ])
 
+            inf_ds = monai.data.Dataset(data=inf_data_dict,
+                                        transform=inf_transforms,
+                                       )
+
+            inf_loader = DataLoader(inf_ds,
+                                    batch_size=1,
+                                    shuffle=False,
+                                    num_workers=opt.workers,
+                                    collate_fn=list_data_collate
+                                    )
+
         ## Define CacheDataset and DataLoader for training and validation
-        train_ds = monai.data.PersistentDataset(data=train_data_dict,
-                                                transform=train_transforms,
-                                                cache_dir=CACHE_DIR
-                                                )
+        if opt.debug:
+            train_ds = monai.data.Dataset(data=train_data_dict,
+                                          transform=train_transforms,
+                                                    )
+
+            val_ds = monai.data.Dataset(data=val_data_dict,
+                                        transform=val_transforms,
+                                                  )
+        else:
+            train_ds = monai.data.PersistentDataset(data=train_data_dict,
+                                                    transform=train_transforms,
+                                                    cache_dir=CACHE_DIR
+                                                    )
+
+            val_ds = monai.data.PersistentDataset(data=val_data_dict,
+                                                  transform=val_transforms,
+                                                  cache_dir=CACHE_DIR
+                                                  )
 
         train_loader = DataLoader(train_ds,
                                   batch_size=opt.batch_size,
@@ -270,11 +328,6 @@ if __name__ == '__main__':
                                   )
 
         # Validation
-        val_ds = monai.data.PersistentDataset(data=val_data_dict,
-                                              transform=val_transforms,
-                                              cache_dir=CACHE_DIR
-                                              )
-
         val_loader = DataLoader(val_ds,
                                 batch_size=opt.batch_size,
                                 shuffle=do_shuffling,
@@ -283,7 +336,7 @@ if __name__ == '__main__':
                                 )
 
     # Model loading: If parameter is not None, then it has to, currently, be a full path to a model!
-    model, criterion_heatmap, criterion_paf = create_model(opt)
+    model, criterion_heatmap, criterion_paf = create_model(opt, models_dir=MODELS_DIR, model_device=device)
     model = model.to(device)
 
     # Create optimizer
@@ -293,8 +346,17 @@ if __name__ == '__main__':
     # Create logger
     writer = SummaryWriter(os.path.join(LOG_DIR, 'runBackBone'))
 
-    TT = trainTT(MODELS_DIR, FIG_DIR, writer, train_loader, val_loader, opt, model, optimizer, scheduler,
-                 criterion_heatmap, criterion_paf,
-                 selected_heatmaps, selected_PAFs)
-    TT.train()
-    print("BB-training completed")
+    if opt.phase == "train":
+        TT = trainTT(MODELS_DIR, FIG_DIR, writer, train_loader, val_loader, opt, model, optimizer, scheduler,
+                     criterion_heatmap, criterion_paf,
+                     selected_heatmaps, selected_PAFs,
+                     opt.debug)
+        TT.train()
+        print("BB-training completed")
+    else:
+        TT = testTT(MODELS_DIR, FIG_DIR, writer, inf_loader, opt, model,
+                    selected_heatmaps, selected_PAFs,
+                    opt.debug)
+        TT.test()
+        print("BB-inference completed")
+

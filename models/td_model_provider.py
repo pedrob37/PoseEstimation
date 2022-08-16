@@ -106,7 +106,7 @@ def parse_criterion(criterion):
         raise ValueError('Criterion ' + criterion + ' not supported')
 
 
-def create_model(opt):
+def create_model(opt, models_dir=None, model_device=None):
     if opt.model == 'vgg':
         backend = VGG()
         backend_feats = 128
@@ -139,9 +139,19 @@ def create_model(opt):
                              num_conv_blocks=5,
                              densenet_approach=opt.densenet_approach
                              )
-    if not opt.load_model == 'none':
-        model.load_state_dict(torch.load(opt.loadModel))
-        print('Loaded models from ' + opt.loadModel)
+    if opt.phase == "inference":
+        # Find relevant model
+        import glob
+        model_files = glob.glob(os.path.join(models_dir, '*.pth'))
+        for some_model_file in model_files:
+            print(some_model_file)
+        sorted_model_files = sorted(model_files, key=os.path.getmtime)
+        # Allows inference to be run on nth latest file!
+        latest_model_file = sorted_model_files[-1]
+        checkpoint = torch.load(latest_model_file, map_location=model_device)
+
+        model.load_state_dict(checkpoint)
+        print('Loaded models from ' + models_dir)
     criterion_hm = parse_criterion(opt.criterion_heatmap)
     criterion_paf = parse_criterion(opt.criterion_paf)
     return model, criterion_hm, criterion_paf

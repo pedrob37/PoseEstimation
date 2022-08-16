@@ -69,6 +69,10 @@ class BaseOptions:
                             help='Using coordconv or not')
         parser.add_argument('--densenet_approach', type=self.str2bool, nargs='?', const=True, default=True,
                             help='Using densenet approach to 3x3 conv blocks or not')
+        parser.add_argument('--weighted_sampling', type=self.str2bool, nargs='?', const=True, default=False,
+                            help='Whether to crop centrally or not')
+        parser.add_argument('--debug', type=self.str2bool, nargs='?', const=True, default=False,
+                            help='Debug or not')
 
         self.initialized = True
 

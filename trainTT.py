@@ -8,7 +8,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class trainTT:
     def __init__(self, models_dir, figures_dir, writer, train_loader, val_loader, opt, model, optimizer, scheduler,
-                 criterion_hm, criterion_paf, selected_heatmaps, selected_pafs):
+                 criterion_hm, criterion_paf, selected_heatmaps, selected_pafs, debug):
         self.models_dir = models_dir
         self.figures_dir = figures_dir
         self.writer = writer
@@ -24,6 +24,8 @@ class trainTT:
 
         self.selected_heatmaps = selected_heatmaps
         self.selected_PAFs = selected_pafs
+
+        self.debug = debug
 
     def train(self):
         writerBB = self.writer
@@ -44,6 +46,18 @@ class trainTT:
 
                 # Affine: For output-saving purposes
                 affine = patch_s['image_meta_dict']['affine'][0, ...]
+
+                # Debug saving
+                if self.debug:
+                    print("Debug saving!")
+                    batch_label = patch_s['label'].to(device)
+                    batch_coords = patch_s['coords'].to(device)
+                    val_saver(batch_image.squeeze().cpu().detach().numpy(), affine, self.figures_dir, "Image_test",
+                              epoch, iteration)
+                    val_saver(batch_label.squeeze().cpu().detach().numpy(), affine, self.figures_dir, "Label_test",
+                              epoch, iteration)
+                    val_saver(batch_coords.squeeze().permute(1, 2, 3, 0).cpu().detach().numpy(), affine, self.figures_dir, "Coords_test",
+                              epoch, iteration)
 
                 # Outputs
                 heatmap_outputs, paf_outputs = self.model(batch_image)
@@ -68,13 +82,13 @@ class trainTT:
                     loss_PAF += self.PAF_torch_loss(batch_paf, paf_out)
 
                     # Save outputs once every epoch
-                    if (iteration == 0) and (ii == len(heatmap_outputs)-1):
+                    if (iteration == 0) and (ii == (len(heatmap_outputs)-1)):
                         # Save output heatmap and paf
                         val_saver(heatmap_out.max(axis=1)[0].squeeze().cpu().detach().numpy(),
                                   affine, self.figures_dir, "Train_heatmap", epoch, ii)
                         val_saver(paf_out.sum(axis=-1).squeeze().permute(3, 1, 2, 0).cpu().detach().numpy(),
                                   affine, self.figures_dir, "Train_paf", epoch, ii)
-                        if ii == 0:
+                        if ii == (len(heatmap_outputs)-1):
                             # Save OGs
                             val_saver(batch_heatmap.max(axis=1)[0].squeeze().cpu().detach().numpy(),
                                       affine, self.figures_dir, "Train_GT_heatmap", epoch, None)
@@ -90,11 +104,17 @@ class trainTT:
                       f'Heatmap: {loss_HM.item():.3f}, '
                       f'PAF: {loss_PAF.item():.3f}\n')
 
-                # Epoch is very small, so just log once per epoch
-                if iteration == np.random.randint(0, len(self.train_loader)):
-                    writerBB.add_scalar("Loss/Backbone_Overall", loss.item(), epoch)
-                    writerBB.add_scalar("Loss/Backbone_HeatMap", loss_HM.item(), epoch)
-                    writerBB.add_scalar("Loss/Backbone_PAF", loss_PAF.item(), epoch)
+                # If epoch is very small, so just log once per epoch
+                if len(self.train_loader) < 100:
+                    if iteration == np.random.randint(0, len(self.train_loader)):
+                        writerBB.add_scalar("Loss/Backbone_Overall", loss.item(), epoch)
+                        writerBB.add_scalar("Loss/Backbone_HeatMap", loss_HM.item(), epoch)
+                        writerBB.add_scalar("Loss/Backbone_PAF", loss_PAF.item(), epoch)
+                else:
+                    if iteration % 100 == 0:
+                        writerBB.add_scalar("Loss/Backbone_Overall", loss.item(), iteration)
+                        writerBB.add_scalar("Loss/Backbone_HeatMap", loss_HM.item(), iteration)
+                        writerBB.add_scalar("Loss/Backbone_PAF", loss_PAF.item(), iteration)
 
                 self.model.zero_grad()
                 loss.backward()
@@ -105,8 +125,8 @@ class trainTT:
                 del heatmap_outputs, paf_outputs
                 del batch_image, batch_heatmap, batch_paf, patch_s
 
-            ## Validation
-            if (epoch + 1) % self.opt.validation_interval == 0:
+            ## Validation: Start at zero
+            if epoch % self.opt.validation_interval == 0:
                 # Set model to eval mode
                 self.model.eval()
                 # Save Model
@@ -193,3 +213,42 @@ class trainTT:
                     writerBB.add_scalar("Loss/Val_Backbone_PAF", np.mean(agg_paf_loss), epoch)
                     del agg_loss, agg_heatmap_loss, agg_paf_loss
             self.scheduler.step()
+
+
+class testTT:
+    def __init__(self, models_dir, figures_dir, writer, inf_loader, opt, model,
+                 selected_heatmaps, selected_pafs, debug):
+        self.models_dir = models_dir
+        self.figures_dir = figures_dir
+        self.writer = writer
+        self.inf_loader = inf_loader
+        self.opt = opt
+        self.model = model
+
+        self.selected_heatmaps = selected_heatmaps
+        self.selected_PAFs = selected_pafs
+
+        self.debug = debug
+
+    def test(self):
+        from monai.inferers import sliding_window_inference
+        self.model.eval()
+        for iteration, patch_s in enumerate(self.inf_loader):
+            batch_image = patch_s['image'].to(device)
+
+            # Affine: For output-saving purposes
+            affine = patch_s['image_meta_dict']['affine'][0, ...]
+
+            sub_name = patch_s['image_meta_dict']["filename_or_obj"][0]
+
+            heatmap_outputs, paf_outputs = sliding_window_inference(batch_image,
+                                                                    self.opt.patch_size,
+                                                                    1,
+                                                                    self.model,
+                                                                    mode="gaussian",
+                                                                    overlap=0.0)
+
+            val_saver(heatmap_outputs.squueze().cpu().detach().numpy(), affine, self.figures_dir,
+                      f"HM_{sub_name}", 999, iteration)
+            val_saver(paf_outputs.squeeze().permute(3, 1, 2, 0).cpu().detach().numpy(), affine, self.figures_dir,
+                      f"PAF_{sub_name}", 999, iteration)

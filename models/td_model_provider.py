@@ -144,9 +144,11 @@ def create_model(opt, models_dir=None, model_device=None):
     import glob
     model_files = glob.glob(os.path.join(models_dir, '*.pth'))
     if len(model_files) > 0:
+        print(model_files)
         for some_model_file in model_files:
             print(some_model_file)
         sorted_model_files = sorted(model_files, key=os.path.getmtime)
+
         # Allows inference to be run on nth latest file!
         latest_model_file = sorted_model_files[-1]
         checkpoint = torch.load(latest_model_file, map_location=model_device)

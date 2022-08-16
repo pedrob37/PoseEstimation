@@ -81,7 +81,7 @@ if __name__ == '__main__':
             full_PAFs[f"PAFs_{relevant_PAF_ID}"] = sorted(glob.glob(os.path.join(PAFs_dir,
                                                                                  f"*PAF_full_{relevant_PAF_ID}.nii.gz")))
 
-        # Splits: Random NON-GLOBAL shuffle:
+        # Splits: Random (With seed) NON-GLOBAL shuffle:
         # https://stackoverflow.com/questions/19306976/python-shuffling-with-a-parameter-to-get-the-same-result
         random.Random(1).shuffle(full_images)
         random.Random(1).shuffle(full_labels)
@@ -194,89 +194,75 @@ if __name__ == '__main__':
         num_PAFs = len([f"PAF_{paf}" for paf in selected_PAFs])
         nearest_list = ["nearest"] * (num_heatmaps + num_PAFs)
         zeros_list = ["zeros"] * (num_heatmaps + num_PAFs)
-        # Transform lists
-        train_transform_list = [LoadImaged(keys=relevant_keys),
-                                AddChanneld(keys=PAF_less_keys),
-                                AsChannelFirstd(keys=PAF_keys),
-                                # Temp
-                                # CoordConvd(keys=['image'], spatial_channels=(1, 2, 3)),
-                                # Don't normalise? Dealing with binaries
-                                # NormalizeIntensityd(keys=['image', 'label'], channel_wise=True),
-                                ]
 
-        # Cropped size
-        if opt.weighted_sampling:
-            cropped_roi_size = opt.patch_size
-            train_transform_list.append(SpatialCropd(keys=['image', 'label'],  # , 'coords'],
-                                                     roi_size=cropped_roi_size,
-                                                     roi_center=(96, 114, 0)))  # Leaning right 56, 74, 0
-            # CoordConvd(keys=['image'], spatial_channels=(1, 2, 3))]
-            if opt.augmentation_level == "none":
-                # Don't add any augmentations
-                pass
-            elif opt.augmentation_level == 'light':
-                train_transform_list.extend([RandGaussianNoised(keys=['image'], prob=0.5, mean=0.0, std=0.25),
-                                             RandAffined(keys=relevant_keys,
-                                                         # spatial_size=(201, 201, 71),
-                                                         scale_range=(0.1, 0.1, 0.1),
-                                                         rotate_range=(0.25, 0.25, 0.25),
-                                                         translate_range=(20, 20, 20),
-                                                         mode=["nearest", "nearest"] + nearest_list,
-                                                         as_tensor_output=False, prob=0.5,
-                                                         padding_mode=['zeros', 'zeros'] + zeros_list)])
-        else:
-            if opt.augmentation_level == "none":
-                # Don't add any augmentations
-                pass
-            elif opt.augmentation_level == 'light':
-                train_transform_list.extend([RandGaussianNoised(keys=['image'], prob=0.5, mean=0.0, std=0.25),
-                                             RandAffined(keys=relevant_keys,
-                                                         spatial_size=(201, 201, 71),
-                                                         scale_range=(0.1, 0.1, 0.1),
-                                                         rotate_range=(0.25, 0.25, 0.25),
-                                                         translate_range=(20, 20, 20),
-                                                         mode=["bilinear", "nearest"] + nearest_list,
-                                                         as_tensor_output=False, prob=0.5,
-                                                         padding_mode=['zeros', 'zeros'] + zeros_list)])
-        # Extend with missing transforms
-        if not opt.weighted_sampling:
-            train_transform_list.extend([RandCropByPosNegLabeld(keys=relevant_keys,
-                                                                label_key='label', image_key='image',
-                                                                spatial_size=opt.patch_size, pos=100, neg=0,
-                                                                num_samples=opt.num_samples),
-                                         Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
-                                         ToTensord(keys=relevant_keys)])
-        elif opt.weighted_sampling:
-            train_transform_list.extend([Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
-                                         ToTensord(keys=relevant_keys)])
+        if opt.phase == "train":
+            # Transform lists
+            train_transform_list = [LoadImaged(keys=relevant_keys),
+                                    AddChanneld(keys=PAF_less_keys),
+                                    AsChannelFirstd(keys=PAF_keys),
+                                    # Temp
+                                    # CoordConvd(keys=['image'], spatial_channels=(1, 2, 3)),
+                                    # Don't normalise? Dealing with binaries
+                                    # NormalizeIntensityd(keys=['image', 'label'], channel_wise=True),
+                                    ]
 
-        # Compose
-        train_transforms = Compose(train_transform_list)
+            # Cropped size
+            if opt.weighted_sampling:
+                cropped_roi_size = opt.patch_size
+                train_transform_list.append(SpatialCropd(keys=relevant_keys,  # , 'coords'],
+                                                         roi_size=cropped_roi_size,
+                                                         roi_center=(96, 114, 0)))  # Leaning right 56, 74, 0
+                # CoordConvd(keys=['image'], spatial_channels=(1, 2, 3))]
+                if opt.augmentation_level == "none":
+                    # Don't add any augmentations
+                    pass
+                elif opt.augmentation_level == 'light':
+                    train_transform_list.extend([# RandGaussianNoised(keys=['image'], prob=0.5, mean=0.0, std=0.25),
+                                                 RandAffined(keys=relevant_keys,
+                                                             # spatial_size=(201, 201, 71),
+                                                             scale_range=(0.1, 0.1, 0.1),
+                                                             rotate_range=(0.25, 0.25, 0.25),
+                                                             translate_range=(20, 20, 20),
+                                                             mode=["nearest", "nearest"] + nearest_list,
+                                                             as_tensor_output=False, prob=0.5,
+                                                             padding_mode=['zeros', 'zeros'] + zeros_list)])
+            else:
+                if opt.augmentation_level == "none":
+                    # Don't add any augmentations
+                    pass
+                elif opt.augmentation_level == 'light':
+                    train_transform_list.extend([# RandGaussianNoised(keys=['image'], prob=0.5, mean=0.0, std=0.25),
+                                                 RandAffined(keys=relevant_keys,
+                                                             spatial_size=(201, 201, 71),
+                                                             scale_range=(0.1, 0.1, 0.1),
+                                                             rotate_range=(0.25, 0.25, 0.25),
+                                                             translate_range=(20, 20, 20),
+                                                             mode=["bilinear", "nearest"] + nearest_list,
+                                                             as_tensor_output=False, prob=0.5,
+                                                             padding_mode=['zeros', 'zeros'] + zeros_list)])
+            # Extend with missing transforms
+            if not opt.weighted_sampling:
+                train_transform_list.extend([#RandCropByPosNegLabeld(keys=relevant_keys,
+                                             #                       label_key='label', image_key='image',
+                                             #                       spatial_size=opt.patch_size, pos=100, neg=0,
+                                             #                       num_samples=opt.num_samples),
+                                             Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
+                                             ToTensord(keys=relevant_keys)])
+            elif opt.weighted_sampling:
+                train_transform_list.extend([Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
+                                             ToTensord(keys=relevant_keys)])
 
-        val_transforms = Compose([
-            LoadImaged(keys=relevant_keys),
-            AddChanneld(keys=PAF_less_keys),
-            AsChannelFirstd(keys=PAF_keys),
-            # Orientationd(keys=relevant_keys, axcodes='RAS'),
-            NormalizeIntensityd(keys=['image'], channel_wise=True),
-            # RandGaussianNoised(keys=['image'], prob=0.75, mean=0.0, std=1.75),
-            # RandRotate90d(keys=['image', 'heatmap', 'paf'], prob=0.5, spatial_axes=[0, 2]),
-            # CropForegroundd(keys=relevant_keys,
-            #                 source_key='image'),
-            # RandCropByPosNegLabeld(keys=relevant_keys,
-            #                        label_key='label', image_key='image',
-            #                        spatial_size=[opt.patch_size, opt.patch_size, opt.patch_size], pos=100, neg=0,
-            #                        num_samples=opt.num_samples),
-            Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
-            ToTensord(keys=relevant_keys)
-        ])
+            # Compose
+            train_transforms = Compose(train_transform_list)
 
-        if opt.phase == "inference":
-            inf_transforms = Compose([
+            val_transforms = Compose([
                 LoadImaged(keys=relevant_keys),
-                AddChanneld(keys=relevant_keys),
-                # Orientationd(keys=relevant_keys, axcodes='RAS'),
-                NormalizeIntensityd(keys=['image'], channel_wise=True),
+                AddChanneld(keys=PAF_less_keys),
+                AsChannelFirstd(keys=PAF_keys),
+                SpatialCropd(keys=relevant_keys,  # , 'coords'],
+                             roi_size=cropped_roi_size,
+                             roi_center=(96, 114, 0)),  # Leaning right 56, 74, 0
+                # NormalizeIntensityd(keys=['image'], channel_wise=True),
                 # RandGaussianNoised(keys=['image'], prob=0.75, mean=0.0, std=1.75),
                 # RandRotate90d(keys=['image', 'heatmap', 'paf'], prob=0.5, spatial_axes=[0, 2]),
                 # CropForegroundd(keys=relevant_keys,
@@ -288,6 +274,45 @@ if __name__ == '__main__':
                 Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
                 ToTensord(keys=relevant_keys)
             ])
+
+        elif opt.phase == "inference":
+            if opt.weighted_sampling:
+                inf_transforms = Compose([
+                    LoadImaged(keys=relevant_keys),
+                    AddChanneld(keys=PAF_less_keys),
+                    SpatialCropd(keys=relevant_keys,  # , 'coords'],
+                                 roi_size=opt.patch_size,
+                                 roi_center=(96, 114, 0)),
+                    # Orientationd(keys=relevant_keys, axcodes='RAS'),
+                    # NormalizeIntensityd(keys=['image'], channel_wise=True),
+                    # RandGaussianNoised(keys=['image'], prob=0.75, mean=0.0, std=1.75),
+                    # RandRotate90d(keys=['image', 'heatmap', 'paf'], prob=0.5, spatial_axes=[0, 2]),
+                    # CropForegroundd(keys=relevant_keys,
+                    #                 source_key='image'),
+                    # RandCropByPosNegLabeld(keys=relevant_keys,
+                    #                        label_key='label', image_key='image',
+                    #                        spatial_size=[opt.patch_size, opt.patch_size, opt.patch_size], pos=100, neg=0,
+                    #                        num_samples=opt.num_samples),
+                    Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
+                    ToTensord(keys=relevant_keys)
+                ])
+            else:
+                inf_transforms = Compose([
+                    LoadImaged(keys=relevant_keys),
+                    AddChanneld(keys=PAF_less_keys),
+                    # Orientationd(keys=relevant_keys, axcodes='RAS'),
+                    NormalizeIntensityd(keys=['image'], channel_wise=True),
+                    # RandGaussianNoised(keys=['image'], prob=0.75, mean=0.0, std=1.75),
+                    # RandRotate90d(keys=['image', 'heatmap', 'paf'], prob=0.5, spatial_axes=[0, 2]),
+                    # CropForegroundd(keys=relevant_keys,
+                    #                 source_key='image'),
+                    # RandCropByPosNegLabeld(keys=relevant_keys,
+                    #                        label_key='label', image_key='image',
+                    #                        spatial_size=[opt.patch_size, opt.patch_size, opt.patch_size], pos=100, neg=0,
+                    #                        num_samples=opt.num_samples),
+                    Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
+                    ToTensord(keys=relevant_keys)
+                ])
 
             inf_ds = monai.data.Dataset(data=inf_data_dict,
                                         transform=inf_transforms,

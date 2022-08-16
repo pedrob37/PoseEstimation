@@ -87,7 +87,7 @@ def val_saver(array, affine_array, fig_path, basename, epoch, step=None):
 
 
 def create_folds(some_list, train_split=0.8, val_split=0.1):
-    # Deterministic! Shuffle outside of this scope
+    # Deterministic! Shuffle outside this scope
     some_list_len = len(some_list)
     output_train_list = some_list[:int(some_list_len * train_split)]
     output_val_list = some_list[int(some_list_len * train_split):int(some_list_len * (train_split + val_split))]

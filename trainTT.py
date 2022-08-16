@@ -231,7 +231,8 @@ class testTT:
         self.debug = debug
 
     def test(self):
-        from monai.inferers import sliding_window_inference
+        from monai.inferers import SimpleInferer
+        simple_inferer = SimpleInferer()
         self.model.eval()
         for iteration, patch_s in enumerate(self.inf_loader):
             batch_image = patch_s['image'].to(device)
@@ -241,12 +242,20 @@ class testTT:
 
             sub_name = patch_s['image_meta_dict']["filename_or_obj"][0]
 
-            heatmap_outputs, paf_outputs = sliding_window_inference(batch_image,
-                                                                    self.opt.patch_size,
-                                                                    1,
-                                                                    self.model,
-                                                                    mode="gaussian",
-                                                                    overlap=0.0)
+            # heatmap_outputs, paf_outputs = sliding_window_inference(batch_image,
+            #                                                         self.opt.patch_size,
+            #                                                         1,
+            #                                                         self.model,
+            #                                                         mode="gaussian",
+            #                                                         overlap=0.0)
+            heatmap_outputs, paf_outputs = simple_inferer(batch_image,
+                                                          self.model)
+            # heatmap_outputs, paf_outputs = sliding_window_inference(batch_image,
+            #                                                         self.opt.patch_size,
+            #                                                         1,
+            #                                                         self.model,
+            #                                                         mode="gaussian",
+            #                                                         overlap=0.0)
 
             val_saver(heatmap_outputs.squueze().cpu().detach().numpy(), affine, self.figures_dir,
                       f"HM_{sub_name}", 999, iteration)

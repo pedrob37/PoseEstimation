@@ -1,8 +1,5 @@
 import argparse
-import os
-from utils.utils import *
 import torch
-import models
 
 
 class BaseOptions:

@@ -56,7 +56,8 @@ class trainTT:
                               epoch, iteration)
                     val_saver(batch_label.squeeze().cpu().detach().numpy(), affine, self.figures_dir, "Label_test",
                               epoch, iteration)
-                    val_saver(batch_coords.squeeze().permute(1, 2, 3, 0).cpu().detach().numpy(), affine, self.figures_dir, "Coords_test",
+                    val_saver(batch_coords.squeeze().permute(1, 2, 3, 0).cpu().detach().numpy(), affine,
+                              self.figures_dir, "Coords_test",
                               epoch, iteration)
 
                 # Outputs
@@ -69,38 +70,47 @@ class trainTT:
                 # Looping through stage samples: Loss is aggregation of these
                 for ii in range(len(heatmap_outputs)):
                     heatmap_out = heatmap_outputs[ii]
-                    paf_out = paf_outputs[ii]
-                    paf_out = torch.reshape(paf_out, [paf_out.shape[0],
-                                                      3,
-                                                      paf_out.shape[2],
-                                                      paf_out.shape[3],
-                                                      paf_out.shape[4],
-                                                      int(paf_out.shape[1] / 3)
-                                                      ])
+                    paf_out = torch.zeros([paf_outputs[ii].shape[0],
+                                           3,
+                                           paf_outputs[ii].shape[2],
+                                           paf_outputs[ii].shape[3],
+                                           paf_outputs[ii].shape[4],
+                                           int(paf_outputs[ii].shape[1] / 3)
+                                           ]).to(device)
+                    # paf_out = torch.reshape(paf_out, [paf_out.shape[0],
+                    #                                   3,
+                    #                                   paf_out.shape[2],
+                    #                                   paf_out.shape[3],
+                    #                                   paf_out.shape[4],
+                    #                                   int(paf_out.shape[1] / 3)
+                    #                                   ])
+                    paf_out[:, 0, ...] = paf_outputs[ii][:, ::3, ...].permute(0, 2, 3, 4, 1)
+                    paf_out[:, 1, ...] = paf_outputs[ii][:, 1::3, ...].permute(0, 2, 3, 4, 1)
+                    paf_out[:, 2, ...] = paf_outputs[ii][:, 2::3, ...].permute(0, 2, 3, 4, 1)
 
                     loss_HM += self.HM_torch_loss(batch_heatmap, heatmap_out)
                     loss_PAF += self.PAF_torch_loss(batch_paf, paf_out)
 
                     # Save outputs once every epoch
-                    if (iteration == 0) and (ii == (len(heatmap_outputs)-1)):
+                    if (iteration == 0) and (ii == (len(heatmap_outputs) - 1)):
                         # Save output heatmap and paf
                         val_saver(heatmap_out.max(axis=1)[0].squeeze().cpu().detach().numpy(),
                                   affine, self.figures_dir, "Train_heatmap", epoch, ii)
                         val_saver(paf_out.sum(axis=-1).squeeze().permute(3, 1, 2, 0).cpu().detach().numpy(),
                                   affine, self.figures_dir, "Train_paf", epoch, ii)
-                        if ii == (len(heatmap_outputs)-1):
+                        if ii == (len(heatmap_outputs) - 1):
                             # Save OGs
                             val_saver(batch_heatmap.max(axis=1)[0].squeeze().cpu().detach().numpy(),
                                       affine, self.figures_dir, "Train_GT_heatmap", epoch, None)
                             val_saver(batch_paf.sum(axis=-1).squeeze().cpu().permute(3, 1, 2, 0).detach().numpy(),
                                       affine, self.figures_dir, "Train_GT_paf", epoch, None)
-                            val_saver(batch_image.sum(axis=-1).squeeze().cpu().detach().numpy(),
+                            val_saver(batch_image.squeeze().cpu().detach().numpy(),
                                       affine, self.figures_dir, "Train_Image", epoch, None)
 
                     del heatmap_out, paf_out
 
                 loss = loss_HM + loss_PAF
-                print(f'BackBone: {loss.item():.3f}, '
+                print(f'Iter {iteration}: BackBone: {loss.item():.3f}, '
                       f'Heatmap: {loss_HM.item():.3f}, '
                       f'PAF: {loss_PAF.item():.3f}\n')
 
@@ -183,8 +193,9 @@ class trainTT:
                                     # Save OGs
                                     val_saver(val_batch_heatmap.max(axis=1)[0].squeeze().cpu().detach().numpy(),
                                               val_affine, self.figures_dir, "Val_GT_heatmap", epoch, None)
-                                    val_saver(val_batch_paf.sum(axis=-1).squeeze().cpu().permute(3, 1, 2, 0).detach().numpy(),
-                                              val_affine, self.figures_dir, "Val_GT_paf", epoch, None)
+                                    val_saver(
+                                        val_batch_paf.sum(axis=-1).squeeze().cpu().permute(3, 1, 2, 0).detach().numpy(),
+                                        val_affine, self.figures_dir, "Val_GT_paf", epoch, None)
                                     val_saver(val_batch_image.sum(axis=-1).squeeze().cpu().detach().numpy(),
                                               val_affine, self.figures_dir, "Val_Image", epoch, None)
                             del val_heatmap_out, val_paf_out

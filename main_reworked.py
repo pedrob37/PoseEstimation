@@ -217,37 +217,37 @@ if __name__ == '__main__':
                     # Don't add any augmentations
                     pass
                 elif opt.augmentation_level == 'light':
-                    train_transform_list.extend([# RandGaussianNoised(keys=['image'], prob=0.5, mean=0.0, std=0.25),
-                                                 RandAffined(keys=relevant_keys,
-                                                             # spatial_size=(201, 201, 71),
-                                                             scale_range=(0.1, 0.1, 0.1),
-                                                             rotate_range=(0.25, 0.25, 0.25),
-                                                             translate_range=(20, 20, 20),
-                                                             mode=["nearest", "nearest"] + nearest_list,
-                                                             as_tensor_output=False, prob=0.5,
-                                                             padding_mode=['zeros', 'zeros'] + zeros_list)])
+                    train_transform_list.extend([  # RandGaussianNoised(keys=['image'], prob=0.5, mean=0.0, std=0.25),
+                        RandAffined(keys=relevant_keys,
+                                    # spatial_size=(201, 201, 71),
+                                    scale_range=(0.1, 0.1, 0.1),
+                                    rotate_range=(0.25, 0.25, 0.25),
+                                    translate_range=(20, 20, 20),
+                                    mode=["nearest", "nearest"] + nearest_list,
+                                    as_tensor_output=False, prob=0.5,
+                                    padding_mode=['zeros', 'zeros'] + zeros_list)])
             else:
                 if opt.augmentation_level == "none":
                     # Don't add any augmentations
                     pass
                 elif opt.augmentation_level == 'light':
-                    train_transform_list.extend([# RandGaussianNoised(keys=['image'], prob=0.5, mean=0.0, std=0.25),
-                                                 RandAffined(keys=relevant_keys,
-                                                             spatial_size=(201, 201, 71),
-                                                             scale_range=(0.1, 0.1, 0.1),
-                                                             rotate_range=(0.25, 0.25, 0.25),
-                                                             translate_range=(20, 20, 20),
-                                                             mode=["bilinear", "nearest"] + nearest_list,
-                                                             as_tensor_output=False, prob=0.5,
-                                                             padding_mode=['zeros', 'zeros'] + zeros_list)])
+                    train_transform_list.extend([  # RandGaussianNoised(keys=['image'], prob=0.5, mean=0.0, std=0.25),
+                        RandAffined(keys=relevant_keys,
+                                    spatial_size=(201, 201, 71),
+                                    scale_range=(0.1, 0.1, 0.1),
+                                    rotate_range=(0.25, 0.25, 0.25),
+                                    translate_range=(20, 20, 20),
+                                    mode=["bilinear", "nearest"] + nearest_list,
+                                    as_tensor_output=False, prob=0.5,
+                                    padding_mode=['zeros', 'zeros'] + zeros_list)])
             # Extend with missing transforms
             if not opt.weighted_sampling:
-                train_transform_list.extend([#RandCropByPosNegLabeld(keys=relevant_keys,
-                                             #                       label_key='label', image_key='image',
-                                             #                       spatial_size=opt.patch_size, pos=100, neg=0,
-                                             #                       num_samples=opt.num_samples),
-                                             Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
-                                             ToTensord(keys=relevant_keys)])
+                train_transform_list.extend([  # RandCropByPosNegLabeld(keys=relevant_keys,
+                    #                       label_key='label', image_key='image',
+                    #                       spatial_size=opt.patch_size, pos=100, neg=0,
+                    #                       num_samples=opt.num_samples),
+                    Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
+                    ToTensord(keys=relevant_keys)])
             elif opt.weighted_sampling:
                 train_transform_list.extend([Spacingd(keys=relevant_keys, pixdim=(1, 1, 1, 1)),
                                              ToTensord(keys=relevant_keys)])
@@ -316,7 +316,7 @@ if __name__ == '__main__':
 
             inf_ds = monai.data.Dataset(data=inf_data_dict,
                                         transform=inf_transforms,
-                                       )
+                                        )
 
             inf_loader = DataLoader(inf_ds,
                                     batch_size=1,
@@ -329,21 +329,30 @@ if __name__ == '__main__':
         if opt.debug:
             train_ds = monai.data.Dataset(data=train_data_dict,
                                           transform=train_transforms,
-                                                    )
+                                          )
 
             val_ds = monai.data.Dataset(data=val_data_dict,
                                         transform=val_transforms,
-                                                  )
+                                        )
         else:
-            train_ds = monai.data.PersistentDataset(data=train_data_dict,
+            train_ds = monai.data.Dataset(data=train_data_dict,
                                                     transform=train_transforms,
-                                                    cache_dir=CACHE_DIR
+                                                    # cache_dir=CACHE_DIR
                                                     )
 
-            val_ds = monai.data.PersistentDataset(data=val_data_dict,
+            val_ds = monai.data.Dataset(data=val_data_dict,
                                                   transform=val_transforms,
-                                                  cache_dir=CACHE_DIR
+                                                  # cache_dir=CACHE_DIR
                                                   )
+            # train_ds = monai.data.PersistentDataset(data=train_data_dict,
+            #                                         transform=train_transforms,
+            #                                         cache_dir=CACHE_DIR
+            #                                         )
+            #
+            # val_ds = monai.data.PersistentDataset(data=val_data_dict,
+            #                                       transform=val_transforms,
+            #                                       cache_dir=CACHE_DIR
+            #                                       )
 
         train_loader = DataLoader(train_ds,
                                   batch_size=opt.batch_size,
@@ -384,4 +393,3 @@ if __name__ == '__main__':
                     opt.debug)
         TT.test()
         print("BB-inference completed")
-

@@ -96,12 +96,12 @@ class trainTT:
                         # Save output heatmap and paf
                         val_saver(heatmap_out.max(axis=1)[0].squeeze().cpu().detach().numpy(),
                                   affine, self.figures_dir, "Train_heatmap", epoch, ii)
-                        val_saver(paf_out.sum(axis=-1).squeeze().permute(3, 1, 2, 0).cpu().detach().numpy(),
-                                  affine, self.figures_dir, "Train_paf", epoch, ii)
+                        val_saver(paf_out.sum(axis=-1).squeeze().permute(1, 2, 3, 0).cpu().detach().numpy(),
+                                  affine, self.figures_dir, "Train_paf", epoch, iteration)
                         # Save OGs
                         val_saver(batch_heatmap.max(axis=1)[0].squeeze().cpu().detach().numpy(),
                                   affine, self.figures_dir, "Train_GT_heatmap", epoch, None)
-                        val_saver(batch_paf.sum(axis=-1).squeeze().cpu().permute(3, 1, 2, 0).detach().numpy(),
+                        val_saver(batch_paf.sum(axis=-1).squeeze().cpu().permute(1, 2, 3, 0).detach().numpy(),
                                   affine, self.figures_dir, "Train_GT_paf", epoch, None)
                         val_saver(batch_image.squeeze().cpu().detach().numpy(),
                                   affine, self.figures_dir, "Train_Image", epoch, None)
@@ -121,9 +121,9 @@ class trainTT:
                         writerBB.add_scalar("Loss/Backbone_PAF", loss_PAF.item(), epoch)
                 else:
                     if iteration % 100 == 0:
-                        writerBB.add_scalar("Loss/Backbone_Overall", loss.item(), iteration)
-                        writerBB.add_scalar("Loss/Backbone_HeatMap", loss_HM.item(), iteration)
-                        writerBB.add_scalar("Loss/Backbone_PAF", loss_PAF.item(), iteration)
+                        writerBB.add_scalar("Loss/Backbone_Overall", loss.item(), epoch*(len(self.train_loader)) + iteration)
+                        writerBB.add_scalar("Loss/Backbone_HeatMap", loss_HM.item(), epoch*(len(self.train_loader)) + iteration)
+                        writerBB.add_scalar("Loss/Backbone_PAF", loss_PAF.item(), epoch*(len(self.train_loader)) + iteration)
 
                 self.model.zero_grad()
                 loss.backward()
@@ -185,18 +185,18 @@ class trainTT:
                             if not agg_loss:  # i.e.: Empty list, so must be first validation step
                                 # Save output heatmap and paf
                                 val_saver(val_heatmap_out.max(axis=1)[0].squeeze().cpu().detach().numpy(),
-                                          val_affine, self.figures_dir, "Val_heatmap", epoch, ii)
+                                          val_affine, self.figures_dir, "Val_heatmap", epoch, iteration)
                                 val_saver(val_paf_out.sum(axis=-1).squeeze().permute(3, 1, 2, 0).cpu().detach().numpy(),
-                                          val_affine, self.figures_dir, "Val_paf", epoch, ii)
+                                          val_affine, self.figures_dir, "Val_paf", epoch, iteration)
                                 if ii == 0:
                                     # Save OGs
                                     val_saver(val_batch_heatmap.max(axis=1)[0].squeeze().cpu().detach().numpy(),
-                                              val_affine, self.figures_dir, "Val_GT_heatmap", epoch, None)
+                                              val_affine, self.figures_dir, "Val_GT_heatmap", epoch, iteration)
                                     val_saver(
                                         val_batch_paf.sum(axis=-1).squeeze().cpu().permute(3, 1, 2, 0).detach().numpy(),
-                                        val_affine, self.figures_dir, "Val_GT_paf", epoch, None)
+                                        val_affine, self.figures_dir, "Val_GT_paf", epoch, iteration)
                                     val_saver(val_batch_image.sum(axis=-1).squeeze().cpu().detach().numpy(),
-                                              val_affine, self.figures_dir, "Val_Image", epoch, None)
+                                              val_affine, self.figures_dir, "Val_Image", epoch, iteration)
                             del val_heatmap_out, val_paf_out
 
                         # Calculate validation loss

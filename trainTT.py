@@ -8,7 +8,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class trainTT:
     def __init__(self, models_dir, figures_dir, writer, train_loader, val_loader, opt, model, optimizer, scheduler,
-                 criterion_hm, criterion_paf, selected_heatmaps, selected_pafs, debug):
+                 criterion_hm, criterion_paf, selected_heatmaps, selected_pafs,
+                 current_epoch=None, current_iteration=None, debug=False):
         self.models_dir = models_dir
         self.figures_dir = figures_dir
         self.writer = writer
@@ -25,11 +26,14 @@ class trainTT:
         self.selected_heatmaps = selected_heatmaps
         self.selected_PAFs = selected_pafs
 
+        self.current_epoch = current_epoch
+        self.current_iteration = current_iteration
+
         self.debug = debug
 
     def train(self):
         writerBB = self.writer
-        for epoch in range(self.opt.num_epochs_backbone):
+        for epoch in range(self.current_epoch, self.opt.num_epochs_backbone):
             print(f'Epoch {epoch}:')
 
             # Set model to train mode
@@ -95,16 +99,20 @@ class trainTT:
                     if (iteration % 100 == 0) and (ii == (len(heatmap_outputs) - 1)):
                         # Save output heatmap and paf
                         val_saver(heatmap_out.max(axis=1)[0].squeeze().cpu().detach().numpy(),
-                                  affine, self.figures_dir, "Train_heatmap", epoch, ii)
+                                  affine, self.figures_dir, "Out_heatmap", epoch, ii)
+                        val_saver(heatmap_out.squeeze().cpu().permute(1, 2, 3, 0).detach().numpy(),
+                                  affine, self.figures_dir, "Out_heatmap_separate", epoch, ii)
                         val_saver(paf_out.sum(axis=-1).squeeze().permute(1, 2, 3, 0).cpu().detach().numpy(),
-                                  affine, self.figures_dir, "Train_paf", epoch, iteration)
+                                  affine, self.figures_dir, "Out_paf", epoch, iteration)
                         # Save OGs
                         val_saver(batch_heatmap.max(axis=1)[0].squeeze().cpu().detach().numpy(),
-                                  affine, self.figures_dir, "Train_GT_heatmap", epoch, None)
+                                  affine, self.figures_dir, "Train_GT_heatmap", epoch, iteration)
+                        val_saver(batch_heatmap.squeeze().cpu().permute(1, 2, 3, 0).detach().numpy(),
+                                  affine, self.figures_dir, "Train_GT_heatmap_separate", epoch, iteration)
                         val_saver(batch_paf.sum(axis=-1).squeeze().cpu().permute(1, 2, 3, 0).detach().numpy(),
-                                  affine, self.figures_dir, "Train_GT_paf", epoch, None)
+                                  affine, self.figures_dir, "Train_GT_paf", epoch, iteration)
                         val_saver(batch_image.squeeze().cpu().detach().numpy(),
-                                  affine, self.figures_dir, "Train_Image", epoch, None)
+                                  affine, self.figures_dir, "Train_GT_Image", epoch, iteration)
 
                     del heatmap_out, paf_out
 
@@ -139,8 +147,18 @@ class trainTT:
                 # Set model to eval mode
                 self.model.eval()
                 # Save Model
-                name = os.path.join(self.models_dir, f'PoseEst_model_{epoch}.pt')
-                torch.save(self.model.state_dict(), name)
+                name = os.path.join(self.models_dir, f'PoseEst_model_{epoch}_iteration_{iteration}.pt')
+
+                # Various relevant model-related variables to save
+                current_state_dict = {
+                    'model_state_dict': self.model.state_dict(),
+                    'epoch': epoch + 1,
+                    'running_iter': iteration,
+                    # 'total_steps': total_steps,
+                    'patch_size': self.opt.patch_size,
+                }
+
+                torch.save(current_state_dict, name)
                 print(f'Saving Model, epoch {epoch}...')
                 with torch.no_grad():
                     agg_heatmap_loss = []

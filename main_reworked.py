@@ -370,7 +370,9 @@ if __name__ == '__main__':
                                 )
 
     # Model loading: If parameter is not None, then it has to, currently, be a full path to a model!
-    model, criterion_heatmap, criterion_paf = create_model(opt, models_dir=MODELS_DIR, model_device=device)
+    model, criterion_heatmap, criterion_paf, current_epoch, current_iteration = create_model(opt,
+                                                                                             models_dir=MODELS_DIR,
+                                                                                             model_device=device)
     model = model.to(device)
 
     # Create optimizer
@@ -383,8 +385,8 @@ if __name__ == '__main__':
     if opt.phase == "train":
         TT = trainTT(MODELS_DIR, FIG_DIR, writer, train_loader, val_loader, opt, model, optimizer, scheduler,
                      criterion_heatmap, criterion_paf,
-                     selected_heatmaps, selected_PAFs,
-                     opt.debug)
+                     selected_heatmaps, selected_PAFs, current_epoch=current_epoch, current_iteration=current_iteration,
+                     debug=opt.debug)
         TT.train()
         print("BB-training completed")
     else:

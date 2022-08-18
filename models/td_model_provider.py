@@ -153,12 +153,18 @@ def create_model(opt, models_dir=None, model_device=None):
         latest_model_file = sorted_model_files[-1]
         checkpoint = torch.load(latest_model_file, map_location=model_device)
 
-        model.load_state_dict(checkpoint)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        current_epoch = checkpoint['epoch']
+        current_iteration = checkpoint['iteration']
+
         print('Loaded models from ' + models_dir)
+    else:
+        current_epoch = 0
+        current_iteration = 0
 
     criterion_hm = parse_criterion(opt.criterion_heatmap)
     criterion_paf = parse_criterion(opt.criterion_paf)
-    return model, criterion_hm, criterion_paf
+    return model, criterion_hm, criterion_paf, current_epoch, current_iteration
 
 
 def create_optimizer(opt, model):

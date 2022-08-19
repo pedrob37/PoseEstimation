@@ -165,7 +165,7 @@ class trainTT:
                     agg_heatmap_loss = []
                     agg_paf_loss = []
                     agg_loss = []
-                    for val_sample in self.val_loader:
+                    for xx, val_sample in enumerate(self.val_loader):
                         val_batch_image = val_sample['image'].to(device)
 
                         # Concatenate all heatmaps and all PAFs into one structure
@@ -210,27 +210,26 @@ class trainTT:
                             val_loss_PAF += self.PAF_torch_loss(val_batch_paf, val_paf_out)
 
                             # Save outputs once every epoch
-                            if not agg_loss:  # i.e.: Empty list, so must be first validation step
+                            if xx % 20 == 0:  # i.e.: Empty list, so must be first validation step
                                 # Save output heatmap and paf
                                 val_saver(val_heatmap_out.max(axis=1)[0].squeeze().cpu().detach().numpy(),
-                                          val_affine, self.figures_dir, "Out_Val_heatmap", epoch, iteration)
+                                          val_affine, self.figures_dir, "Out_Val_heatmap", epoch, xx)
                                 val_saver(val_heatmap_out.squeeze().cpu().permute(1, 2, 3, 0).detach().numpy(),
-                                          val_affine, self.figures_dir, "Out_Val_heatmap_separate", epoch, iteration)
-
+                                          val_affine, self.figures_dir, "Out_Val_heatmap_separate", epoch, xx)
 
                                 val_saver(val_paf_out.sum(axis=-1).squeeze().permute(3, 1, 2, 0).cpu().detach().numpy(),
-                                          val_affine, self.figures_dir, "Val_paf", epoch, iteration)
+                                          val_affine, self.figures_dir, "Val_paf", epoch, xx)
                                 if ii == 0:
                                     # Save OGs
                                     val_saver(val_batch_heatmap.max(axis=1)[0].squeeze().cpu().detach().numpy(),
-                                              val_affine, self.figures_dir, "Val_GT_heatmap", epoch, iteration)
+                                              val_affine, self.figures_dir, "Val_GT_heatmap", epoch, xx)
                                     val_saver(val_batch_heatmap.squeeze().cpu().permute(1, 2, 3, 0).detach().numpy(),
-                                              val_affine, self.figures_dir, "Val_GT_heatmap_separate", epoch, iteration)
+                                              val_affine, self.figures_dir, "Val_GT_heatmap_separate", epoch, xx)
                                     val_saver(
                                         val_batch_paf.sum(axis=-1).squeeze().cpu().permute(3, 1, 2, 0).detach().numpy(),
-                                        val_affine, self.figures_dir, "Val_GT_paf", epoch, iteration)
+                                        val_affine, self.figures_dir, "Val_GT_paf", epoch, xx)
                                     val_saver(val_batch_image.sum(axis=-1).squeeze().cpu().detach().numpy(),
-                                              val_affine, self.figures_dir, "Val_Image", epoch, iteration)
+                                              val_affine, self.figures_dir, "Val_Image", epoch, xx)
                             del val_heatmap_out, val_paf_out
 
                         # Calculate validation loss

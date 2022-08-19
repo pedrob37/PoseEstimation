@@ -335,24 +335,15 @@ if __name__ == '__main__':
                                         transform=val_transforms,
                                         )
         else:
-            train_ds = monai.data.Dataset(data=train_data_dict,
+            train_ds = monai.data.PersistentDataset(data=train_data_dict,
                                                     transform=train_transforms,
-                                                    # cache_dir=CACHE_DIR
+                                                    cache_dir=CACHE_DIR
                                                     )
 
-            val_ds = monai.data.Dataset(data=val_data_dict,
+            val_ds = monai.data.PersistentDataset(data=val_data_dict,
                                                   transform=val_transforms,
-                                                  # cache_dir=CACHE_DIR
+                                                  cache_dir=CACHE_DIR
                                                   )
-            # train_ds = monai.data.PersistentDataset(data=train_data_dict,
-            #                                         transform=train_transforms,
-            #                                         cache_dir=CACHE_DIR
-            #                                         )
-            #
-            # val_ds = monai.data.PersistentDataset(data=val_data_dict,
-            #                                       transform=val_transforms,
-            #                                       cache_dir=CACHE_DIR
-            #                                       )
 
         train_loader = DataLoader(train_ds,
                                   batch_size=opt.batch_size,

@@ -99,11 +99,12 @@ class trainTT:
                     if (iteration % 100 == 0) and (ii == (len(heatmap_outputs) - 1)):
                         # Save output heatmap and paf
                         val_saver(heatmap_out.max(axis=1)[0].squeeze().cpu().detach().numpy(),
-                                  affine, self.figures_dir, "Out_heatmap", epoch, ii)
+                                  affine, self.figures_dir, "Out_heatmap", epoch, iteration)
                         val_saver(heatmap_out.squeeze().cpu().permute(1, 2, 3, 0).detach().numpy(),
-                                  affine, self.figures_dir, "Out_heatmap_separate", epoch, ii)
+                                  affine, self.figures_dir, "Out_heatmap_separate", epoch, iteration)
                         val_saver(paf_out.sum(axis=-1).squeeze().permute(1, 2, 3, 0).cpu().detach().numpy(),
                                   affine, self.figures_dir, "Out_paf", epoch, iteration)
+
                         # Save OGs
                         val_saver(batch_heatmap.max(axis=1)[0].squeeze().cpu().detach().numpy(),
                                   affine, self.figures_dir, "Train_GT_heatmap", epoch, iteration)
@@ -187,14 +188,23 @@ class trainTT:
                         # Looping through stage samples: Loss is aggregation of these
                         for ii in range(len(val_heatmap_outputs)):
                             val_heatmap_out = val_heatmap_outputs[ii]
-                            val_paf_out = val_paf_outputs[ii]
-                            val_paf_out = torch.reshape(val_paf_out, [val_paf_out.shape[0],
-                                                                      3,
-                                                                      val_paf_out.shape[2],
-                                                                      val_paf_out.shape[3],
-                                                                      val_paf_out.shape[4],
-                                                                      int(val_paf_out.shape[1] / 3)
-                                                                      ])
+                            val_paf_out = torch.zeros([val_paf_outputs[ii].shape[0],
+                                                   3,
+                                                   val_paf_outputs[ii].shape[2],
+                                                   val_paf_outputs[ii].shape[3],
+                                                   val_paf_outputs[ii].shape[4],
+                                                   int(val_paf_outputs[ii].shape[1] / 3)
+                                                   ]).to(device)
+                            # paf_out = torch.reshape(paf_out, [paf_out.shape[0],
+                            #                                   3,
+                            #                                   paf_out.shape[2],
+                            #                                   paf_out.shape[3],
+                            #                                   paf_out.shape[4],
+                            #                                   int(paf_out.shape[1] / 3)
+                            #                                   ])
+                            val_paf_out[:, 0, ...] = val_paf_outputs[ii][:, ::3, ...].permute(0, 2, 3, 4, 1)
+                            val_paf_out[:, 1, ...] = val_paf_outputs[ii][:, 1::3, ...].permute(0, 2, 3, 4, 1)
+                            val_paf_out[:, 2, ...] = val_paf_outputs[ii][:, 2::3, ...].permute(0, 2, 3, 4, 1)
 
                             val_loss_HM += self.HM_torch_loss(val_batch_heatmap, val_heatmap_out)
                             val_loss_PAF += self.PAF_torch_loss(val_batch_paf, val_paf_out)
@@ -203,13 +213,19 @@ class trainTT:
                             if not agg_loss:  # i.e.: Empty list, so must be first validation step
                                 # Save output heatmap and paf
                                 val_saver(val_heatmap_out.max(axis=1)[0].squeeze().cpu().detach().numpy(),
-                                          val_affine, self.figures_dir, "Val_heatmap", epoch, iteration)
+                                          val_affine, self.figures_dir, "Out_Val_heatmap", epoch, iteration)
+                                val_saver(val_heatmap_out.squeeze().cpu().permute(1, 2, 3, 0).detach().numpy(),
+                                          val_affine, self.figures_dir, "Out_Val_heatmap_separate", epoch, iteration)
+
+
                                 val_saver(val_paf_out.sum(axis=-1).squeeze().permute(3, 1, 2, 0).cpu().detach().numpy(),
                                           val_affine, self.figures_dir, "Val_paf", epoch, iteration)
                                 if ii == 0:
                                     # Save OGs
                                     val_saver(val_batch_heatmap.max(axis=1)[0].squeeze().cpu().detach().numpy(),
                                               val_affine, self.figures_dir, "Val_GT_heatmap", epoch, iteration)
+                                    val_saver(val_batch_heatmap.squeeze().cpu().permute(1, 2, 3, 0).detach().numpy(),
+                                              val_affine, self.figures_dir, "Val_GT_heatmap_separate", epoch, iteration)
                                     val_saver(
                                         val_batch_paf.sum(axis=-1).squeeze().cpu().permute(3, 1, 2, 0).detach().numpy(),
                                         val_affine, self.figures_dir, "Val_GT_paf", epoch, iteration)

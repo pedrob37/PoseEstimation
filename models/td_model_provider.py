@@ -1,6 +1,7 @@
 from models.td_vgg import VGG
 from models.td_fc import FC
 from models.td_paf_model import PAFModel, PAFModel2019
+from models.td_paf_model_hm_only import HMModel
 from models.custom_resnet import resnet18, resnet34, resnet50
 import torch.nn as nn
 import torch
@@ -60,7 +61,8 @@ def generate_model(opt, partial_load=False):
         missing_dict = {k: v for k, v in net_dict.items() if k not in pretrain_dict_og.keys()}
 
         # If missing too many keys then raise an error
-        print(f'There are {len(pretrain_dict)} keys in the pretrain dict: {len(pretrain_dict)/len(net_dict)*100:.0f}%')
+        print(
+            f'There are {len(pretrain_dict)} keys in the pretrain dict: {len(pretrain_dict) / len(net_dict) * 100:.0f}%')
         if len(pretrain_dict) < 20:
             print(missing_dict.keys())
             raise NotImplementedError
@@ -90,7 +92,8 @@ if verbose_check:
     test_model, test_pretrained_model = generate_model(opt, partial_load=False)
 
     # Check if loading properly
-    print((test_model.state_dict()["layer1.0.conv1.weight"].cuda() == test_pretrained_model["layer1.0.conv1.weight"].cuda()).sum()/torch.numel(test_model.state_dict()["layer1.0.conv1.weight"]))
+    print((test_model.state_dict()["layer1.0.conv1.weight"].cuda() == test_pretrained_model[
+        "layer1.0.conv1.weight"].cuda()).sum() / torch.numel(test_model.state_dict()["layer1.0.conv1.weight"]))
 
     # Try a forward pass
     output = test_model(torch.zeros((1, 1, 80, 80, 80)))
@@ -126,19 +129,26 @@ def create_model(opt, models_dir=None, model_device=None):
         model = PAFModel(backend=backend,
                          backend_outp_feats=backend_feats,
                          n_joints=opt.num_joints,
-                         n_paf=opt.num_pafs*opt.num_vector_fields,
+                         n_paf=opt.num_pafs * opt.num_vector_fields,
                          n_stages=opt.num_stages
                          )
     elif opt.model_version == "new":
         model = PAFModel2019(backend=backend,
                              backend_outp_feats=backend_feats,
                              n_joints=opt.num_joints,
-                             n_paf=opt.num_pafs*opt.num_vector_fields,  # Times ND for N spatial dimensions
-                             n_stages_total=opt.num_stages*2,  # Multiply by two because PAF and HM stages are separate
+                             n_paf=opt.num_pafs * opt.num_vector_fields,  # Times ND for N spatial dimensions
+                             n_stages_total=opt.num_stages * 2,
+                             # Multiply by two because PAF and HM stages are separate
                              n_stages_paf=opt.num_stages_paf,
                              num_conv_blocks=5,
                              densenet_approach=opt.densenet_approach
                              )
+    elif opt.model_version == "HM-only":
+        model = HMModel(backend=backend,
+                        backend_outp_feats=backend_feats,
+                        n_joints=opt.num_joints,
+                        n_stages=opt.num_stages
+                        )
 
     # Find relevant model
     import glob

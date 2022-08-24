@@ -268,8 +268,11 @@ class ClipRanged(MapTransform):
         return d
 
 
-def list_to_dict_reorganiser(input_dict, id_regex=re.compile(r'\d+')):
-    varieties = ["heatmap", "PAF"]
+def list_to_dict_reorganiser(input_dict, id_regex=re.compile(r'\d+'), include_paf=True):
+    if include_paf:
+        varieties = ["heatmap", "PAF"]
+    else:
+        varieties = ["heatmap"]
     for variety in varieties:
         relevant_items = input_dict[variety]
         for variety_item in relevant_items:

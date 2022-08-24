@@ -139,13 +139,13 @@ if __name__ == '__main__':
 
         # Assign heatmaps and PAFs to relevant dictionaries: Train, Val, Inf
         for train_sub in train_data_dict:
-            list_to_dict_reorganiser(train_sub)
+            list_to_dict_reorganiser(train_sub, include_paf=False)
 
         for val_sub in val_data_dict:
-            list_to_dict_reorganiser(val_sub)
+            list_to_dict_reorganiser(val_sub, include_paf=False)
 
         for inf_sub in inf_data_dict:
-            list_to_dict_reorganiser(inf_sub)
+            list_to_dict_reorganiser(inf_sub, include_paf=False)
 
         print(f"Length of inference images, labels, heatmaps: {len(inf_images)}, "
               f"{len(inf_labels)}, "
